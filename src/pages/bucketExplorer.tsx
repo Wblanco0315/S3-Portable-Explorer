@@ -1,0 +1,798 @@
+import React, { useState, useMemo, useEffect } from "react";
+import {
+  useParams,
+  useNavigate,
+  useSearchParams,
+  Link,
+} from "react-router-dom";
+import {
+  HiOutlineLogout,
+  HiOutlineStar,
+  HiOutlineRefresh,
+  HiOutlineFolder,
+  HiOutlinePhotograph,
+  HiOutlineCode,
+  HiOutlineDocument,
+  HiOutlineDocumentText,
+  HiOutlineDownload,
+  HiOutlineShare,
+  HiOutlineArrowLeft,
+  HiOutlineClock,
+  HiOutlineSearch,
+} from "react-icons/hi";
+import { HiStar } from "react-icons/hi";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
+import {
+  listBucketObjects,
+  isAwsAuthenticated,
+  setAwsCredentials,
+  clearAwsCredentials,
+  generatePresignedUrl,
+  startS3Download,
+  uploadS3File,
+  getCurrentActiveProfile,
+} from "../features/aws/s3Client";
+import {
+  addRoute,
+  listRoutes,
+  listFolders,
+  FavoriteFolder,
+  Route,
+  removeRoute,
+} from "../features/favorites/favoritesStore";
+import { getLocalSSOCredentials } from "../features/aws/awsCli";
+import { useDownloadStore } from "../features/downloads/downloadStore";
+
+// Atomic Components
+import { FavoriteModal } from "../features/explorer/components/FavoriteModal";
+import { UploadStatus } from "../features/explorer/components/UploadStatus";
+import { ShareModal } from "../features/explorer/components/ShareModal";
+import { S3Object, SortKey, SortConfig } from "../features/explorer/types";
+import { GenericTable, Column } from "../components/GenericTable";
+import { Breadcrumb, BreadcrumbItem } from "../components/Breadcrumb";
+
+const formatSize = (bytes?: number): string => {
+  if (bytes === undefined || bytes === 0) return "-";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+};
+
+const inferType = (key: string): string => {
+  const ext = key.split(".").pop()?.toLowerCase();
+  if (["jpg", "jpeg", "png", "gif", "svg", "webp"].includes(ext || ""))
+    return "image";
+  if (
+    [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "py",
+      "rs",
+      "go",
+      "html",
+      "css",
+      "json",
+    ].includes(ext || "")
+  )
+    return "code";
+  return "document";
+};
+
+const getIconForType = (type: string) => {
+  switch (type) {
+    case "folder":
+      return <HiOutlineFolder className="text-amber-500" size={22} />;
+    case "image":
+      return <HiOutlinePhotograph className="text-blue-500" size={22} />;
+    case "code":
+      return <HiOutlineCode className="text-purple-500" size={22} />;
+    case "document":
+      return <HiOutlineDocumentText className="text-gray-500" size={22} />;
+    default:
+      return <HiOutlineDocument className="text-gray-400" size={22} />;
+  }
+};
+
+export default function BucketExplorerPage() {
+  const { bucketName } = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Explorer State
+  const [objects, setObjects] = useState<S3Object[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ssoNeedsLogin, setSsoNeedsLogin] = useState(false);
+  const [expiredProfile, setExpiredProfile] = useState<string | null>(null);
+  const [currentPrefix, setCurrentPrefix] = useState(
+    searchParams.get("prefix") || "",
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [sortConfig, setSortConfig] = useState<SortConfig>({
+    key: "name",
+    direction: "asc",
+  });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Favorites states
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [showFavoriteModal, setShowFavoriteModal] = useState(false);
+  const [favoriteName, setFavoriteName] = useState("");
+  const [availableFolders, setAvailableFolders] = useState<FavoriteFolder[]>(
+    [],
+  );
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [isSavingFavorite, setIsSavingFavorite] = useState(false);
+
+  // Feedback states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+
+  // Share modal states
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [itemToShare, setItemToShare] = useState<S3Object | null>(null);
+
+  const downloadTasks = useDownloadStore((state) => state.tasks);
+
+  // Sync currentPrefix with searchParams
+  useEffect(() => {
+    const prefix = searchParams.get("prefix") || "";
+    if (prefix !== currentPrefix) {
+      setCurrentPrefix(prefix);
+    }
+  }, [searchParams]);
+
+  const updatePrefix = (newPrefix: string) => {
+    setCurrentPrefix(newPrefix);
+    if (newPrefix) {
+      setSearchParams({ prefix: newPrefix });
+    } else {
+      setSearchParams({});
+    }
+  };
+
+  const fetchObjects = async () => {
+    if (!bucketName) return;
+    setIsLoading(true);
+    setError(null);
+    setSsoNeedsLogin(false);
+    setExpiredProfile(null);
+    try {
+      const data = await listBucketObjects(bucketName, currentPrefix);
+
+      const foldersMapped: S3Object[] = data.folders.map((f) => {
+        const fullPrefix = f.Prefix || "";
+        const parts = fullPrefix.split("/").filter(Boolean);
+        const name = parts[parts.length - 1] + "/";
+        return {
+          id: fullPrefix,
+          name: name,
+          type: "folder",
+          date: "-",
+          size: "-",
+          rawSize: 0,
+          storageClass: "-",
+        };
+      });
+
+      const filesMapped: S3Object[] = data.files.map((f) => ({
+        id: f.Key || "",
+        name: (f.Key || "").split("/").pop() || "",
+        type: inferType(f.Key || ""),
+        date: f.LastModified?.toISOString() || "-",
+        size: formatSize(f.Size),
+        rawSize: f.Size || 0,
+        storageClass: f.StorageClass || "Standard",
+      }));
+
+      setObjects([...foldersMapped, ...filesMapped]);
+    } catch (err: any) {
+      console.error("Failed to fetch bucket objects:", err);
+      const errMsg = err.message || "Unknown error occurred while fetching objects.";
+      setError(errMsg);
+      if (
+        errMsg.toLowerCase().includes("expired") ||
+        errMsg.toLowerCase().includes("refresh failed") ||
+        errMsg.toLowerCase().includes("login first")
+      ) {
+        setSsoNeedsLogin(true);
+        setExpiredProfile(getCurrentActiveProfile() || "default");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const checkIsFavorite = async () => {
+    if (!bucketName) return;
+    try {
+      const routes = await listRoutes();
+      const normalizePrefix = (p: string) => p.replace(/^\/+|\/+$/g, "");
+      const exists = routes.some(
+        (f) =>
+          f.bucket === bucketName &&
+          normalizePrefix(f.prefix) === normalizePrefix(currentPrefix),
+      );
+      setIsFavorite(exists);
+    } catch (err) {
+      console.error("Failed to check routes", err);
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!bucketName) return;
+
+    if (isFavorite) {
+      // Remove from favorites
+      try {
+        const routes = await listRoutes();
+        const normalizePrefix = (p: string) => p.replace(/^\/+|\/+$/g, "");
+        const match = routes.find(
+          (f) =>
+            f.bucket === bucketName &&
+            normalizePrefix(f.prefix) === normalizePrefix(currentPrefix),
+        );
+        if (match && match.id) {
+          await removeRoute(match.id);
+          setIsFavorite(false);
+        }
+      } catch (err) {
+        console.error("Failed to remove from favorites", err);
+        alert("Error removing from favorites");
+      }
+    } else {
+      setShowFavoriteModal(true);
+    }
+  };
+
+  const loadFolders = async () => {
+    try {
+      const flds = await listFolders();
+      setAvailableFolders(flds);
+    } catch (err) {
+      console.error("Failed to load folders", err);
+    }
+  };
+
+  useEffect(() => {
+    const initExplorer = async () => {
+      if (!isAwsAuthenticated()) {
+        navigate("/buckets", { replace: true });
+        return;
+      }
+
+      // Check if we need to swap profiles based on the favorite route
+      try {
+        const routes = await listRoutes();
+        const currentRoute = routes.find(
+          (r) => r.bucket === bucketName && (currentPrefix.startsWith(r.prefix) || r.prefix === ""),
+        );
+
+        if (currentRoute && currentRoute.profile !== getCurrentActiveProfile()) {
+          console.log(`Swapping profile to: ${currentRoute.profile}`);
+          setIsLoading(true);
+          const creds = await getLocalSSOCredentials(currentRoute.profile);
+          setAwsCredentials(
+            creds.accessKeyId,
+            creds.secretAccessKey,
+            creds.sessionToken,
+            localStorage.getItem("aws_region") || "us-east-1",
+          );
+          localStorage.setItem("aws_sso_profile", currentRoute.profile);
+        }
+      } catch (err: any) {
+        console.error("Auto-profile swap failed", err);
+        const errMsg = err.message || "Auto-profile swap failed";
+        setError(errMsg);
+        if (
+          errMsg.toLowerCase().includes("expired") ||
+          errMsg.toLowerCase().includes("refresh failed") ||
+          errMsg.toLowerCase().includes("login first")
+        ) {
+          setSsoNeedsLogin(true);
+          const routes = await listRoutes();
+          const currentRoute = routes.find(
+            (r) => r.bucket === bucketName && (currentPrefix.startsWith(r.prefix) || r.prefix === ""),
+          );
+          setExpiredProfile(currentRoute?.profile || getCurrentActiveProfile() || "default");
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      await fetchObjects();
+      await checkIsFavorite();
+      await loadFolders();
+    };
+
+    initExplorer();
+  }, [bucketName, currentPrefix, navigate]);
+
+  const handleAddFavorite = async () => {
+    if (!bucketName || !favoriteName.trim()) return;
+    setIsSavingFavorite(true);
+    try {
+      const currentProfile =
+        localStorage.getItem("aws_sso_profile") || "default";
+      await addRoute({
+        name: favoriteName.trim(),
+        bucket: bucketName,
+        prefix: currentPrefix,
+        profile: currentProfile,
+        folder_id: selectedFolderId,
+      });
+      setIsFavorite(true);
+      setShowFavoriteModal(false);
+      setFavoriteName("");
+      setSelectedFolderId(null);
+    } catch (err: any) {
+      console.error("Failed to add favorite", err);
+      alert("Error saving favorite: " + err.message);
+    } finally {
+      setIsSavingFavorite(false);
+    }
+  };
+
+  const handleShare = (object: S3Object) => {
+    setItemToShare(object);
+    setIsShareModalOpen(true);
+  };
+
+  const handleGenerateSharedLink = async (expiresIn: number) => {
+    if (!bucketName || !itemToShare) throw new Error("No object selected");
+    return await generatePresignedUrl(bucketName, itemToShare.id, expiresIn);
+  };
+
+  const handleDownload = async (object: S3Object) => {
+    try {
+      await startS3Download(bucketName!, object.id, object.name);
+    } catch (err: any) {
+      alert("Error starting download: " + err.message);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!bucketName) return;
+    try {
+      const selected = await open({
+        multiple: true,
+        title: "Select files to upload",
+      });
+      if (!selected) return;
+      const files = Array.isArray(selected) ? selected : [selected];
+      setIsUploading(true);
+      let uploadedCount = 0;
+      for (const filePath of files) {
+        const fileName = filePath.split(/[\\/]/).pop() || "unknown";
+        setUploadStatus(
+          `Uploading ${fileName}... (${uploadedCount + 1}/${files.length})`,
+        );
+        const fileData = await readFile(filePath);
+        const s3Key = currentPrefix + fileName;
+        await uploadS3File(bucketName, s3Key, fileData);
+        uploadedCount++;
+      }
+      setUploadStatus(`Successfully uploaded ${uploadedCount} file(s)`);
+      setTimeout(() => setUploadStatus(null), 3000);
+      fetchObjects();
+    } catch (err: any) {
+      console.error("Upload failed", err);
+      alert("Upload failed: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const currentFiles = useMemo(() => {
+    let filtered = objects.filter((file) => {
+      const matchesSearch = file.name
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === "all" || file.type === typeFilter;
+      return matchesSearch && matchesType;
+    });
+
+    filtered.sort((a, b) => {
+      let valA: any = a[sortConfig.key];
+      let valB: any = b[sortConfig.key];
+
+      if (sortConfig.key === "size") {
+        valA = a.rawSize;
+        valB = b.rawSize;
+      }
+
+      if (sortConfig.key === "name") {
+        if (a.type === "folder" && b.type !== "folder") return -1;
+        if (a.type !== "folder" && b.type === "folder") return 1;
+      }
+
+      if (typeof valA === "string") valA = valA.toLowerCase();
+      if (typeof valB === "string") valB = valB.toLowerCase();
+
+      if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
+      if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [objects, searchTerm, typeFilter, sortConfig]);
+
+  const isAllSelected =
+    currentFiles.length > 0 && selectedIds.size === currentFiles.length;
+
+  const toggleSelection = (id: string | number) => {
+    const next = new Set(selectedIds);
+    if (next.has(id.toString())) next.delete(id.toString());
+    else next.add(id.toString());
+    setSelectedIds(next);
+  };
+
+  const handleSelectAll = () => {
+    if (isAllSelected) setSelectedIds(new Set());
+    else setSelectedIds(new Set(currentFiles.map((f) => f.id)));
+  };
+
+  const handleLogout = () => {
+    clearAwsCredentials();
+    localStorage.removeItem("aws_sso_profile");
+    localStorage.removeItem("aws_region");
+    localStorage.removeItem("aws_auth_method");
+    navigate("/buckets", { replace: true });
+  };
+
+  const columns: Column<S3Object>[] = [
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      render: (obj) => {
+        const downloadTask = downloadTasks.find(
+          (t) =>
+            t.key === obj.id &&
+            (t.status === "downloading" || t.status === "queued"),
+        );
+        return (
+          <div className="flex items-center gap-3">
+            <div className="group-hover:scale-110 transition-transform">
+              {getIconForType(obj.type)}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span
+                className={`font-bold truncate text-sm ${obj.type === "folder" ? "text-indigo-600 dark:text-indigo-400/90 hover:underline" : "text-gray-900 dark:text-slate-200"}`}
+              >
+                {obj.name}
+              </span>
+              {downloadTask && (
+                <div className="flex items-center gap-1.5 mt-0.5 animate-in slide-in-from-top-1">
+                  {downloadTask.status === "downloading" ? (
+                    <>
+                      <div className="w-16 h-1 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-600 transition-all duration-300"
+                          style={{ width: `${downloadTask.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-[9px] text-indigo-600 font-black">
+                        {Math.round(downloadTask.progress)}%
+                      </span>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                      <HiOutlineClock className="w-3 h-3" /> Queued
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: "type",
+      header: "Type",
+      sortable: true,
+      className:
+        "text-gray-400 font-bold text-[10px] uppercase tracking-widest",
+    },
+    {
+      key: "date",
+      header: "Last Modified",
+      sortable: true,
+      className: "text-gray-500 font-medium text-xs",
+      render: (obj) =>
+        obj.date !== "-" ? new Date(obj.date).toLocaleString() : "-",
+    },
+    {
+      key: "size",
+      header: "Size",
+      sortable: true,
+      className: "text-gray-500 font-medium text-xs",
+    },
+    {
+      key: "storageClass",
+      header: "Storage Class",
+      render: (obj) =>
+        obj.storageClass !== "-" ? (
+          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 font-bold text-[9px] rounded-md uppercase border border-gray-200 tracking-wider">
+            {obj.storageClass}
+          </span>
+        ) : (
+          "-"
+        ),
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (obj) => {
+        const isDownloading = downloadTasks.some(
+          (t) =>
+            t.key === obj.id &&
+            (t.status === "downloading" || t.status === "queued"),
+        );
+        return (
+          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {obj.type !== "folder" && !isDownloading && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(obj);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-lg border border-transparent hover:border-gray-100 transition-all"
+                  title="Download"
+                >
+                  <HiOutlineDownload size={16} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleShare(obj);
+                  }}
+                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-lg border border-transparent hover:border-gray-100 transition-all"
+                  title="Share"
+                >
+                  <HiOutlineShare size={16} />
+                </button>
+              </>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 bg-gray-50 dark:bg-slate-950 p-4 md:p-8 font-sans text-gray-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
+      <div className="w-full mx-auto">
+        <Breadcrumb
+          items={[
+            { label: "Amazon S3", path: "/buckets" },
+            { label: "Buckets", path: "/buckets" },
+            {
+              label: bucketName || "Bucket",
+              onClick: () => updatePrefix(""),
+              active: !currentPrefix,
+            },
+            ...currentPrefix
+              .split("/")
+              .filter(Boolean)
+              .map((part, idx, arr) => ({
+                label: part,
+                onClick: () =>
+                  updatePrefix(arr.slice(0, idx + 1).join("/") + "/"),
+                active: idx === arr.length - 1,
+              })),
+          ]}
+        />
+
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
+              <div className="p-1.5 bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400/80 rounded-lg border border-indigo-200/50 dark:border-indigo-500/20">
+                <HiOutlineFolder size={20} />
+              </div>
+              {currentPrefix.split("/").filter(Boolean).pop() || bucketName}
+            </h1>
+            <button
+              onClick={handleToggleFavorite}
+              className={`p-1.5 rounded-xl transition-all cursor-pointer ${isFavorite ? "text-amber-400 dark:text-amber-400/90 bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 shadow-sm hover:bg-amber-100 dark:hover:bg-amber-500/20" : "text-gray-400 dark:text-slate-500 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 hover:text-amber-500 dark:hover:text-amber-400 hover:shadow-md active:scale-95"}`}
+              title={isFavorite ? "Remove from My Routes" : "Add to My Routes"}
+            >
+              {isFavorite ? <HiStar size={20} /> : <HiOutlineStar size={20} />}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchObjects}
+              className="p-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-300 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-all shadow-sm active:scale-95"
+              title="Refresh"
+            >
+              <HiOutlineRefresh
+                size={16}
+                className={isLoading ? "animate-spin" : ""}
+              />
+            </button>
+            <button
+              onClick={handleUpload}
+              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+            >
+              Upload Files
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/20 transition-all border border-red-100 dark:border-red-500/20"
+              title="Sign out"
+            >
+              <HiOutlineLogout size={16} />
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-5 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-2xl animate-in slide-in-from-top-2">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <span className="font-bold text-sm leading-relaxed">{error}</span>
+                {!ssoNeedsLogin && (
+                  <button
+                    onClick={fetchObjects}
+                    className="px-4 py-2 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-300 font-bold rounded-xl transition-all active:scale-95 text-xs uppercase tracking-wider"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+              
+              {ssoNeedsLogin && (
+                <div className="mt-2 p-4 bg-amber-50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/20 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-300">
+                  <div className="flex-1">
+                    <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider font-sans">
+                      SSO Session Expired
+                    </h4>
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400/85 font-medium mt-0.5 font-sans leading-relaxed">
+                      The active token for AWS profile '{expiredProfile}' has expired. Click below to re-authenticate in your browser.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={async () => {
+                      setIsLoading(true);
+                      setError(null);
+                      try {
+                        const { triggerSSOLogin } = await import("../features/aws/awsCli");
+                        await triggerSSOLogin(expiredProfile || "default");
+                        setSsoNeedsLogin(false);
+                        setExpiredProfile(null);
+                        
+                        // Re-authenticate locally
+                        const creds = await getLocalSSOCredentials(expiredProfile || "default");
+                        setAwsCredentials(
+                          creds.accessKeyId,
+                          creds.secretAccessKey,
+                          creds.sessionToken,
+                          localStorage.getItem("aws_region") || "us-east-1",
+                        );
+                        localStorage.setItem("aws_sso_profile", expiredProfile || "default");
+                        
+                        // Retry fetching objects
+                        await fetchObjects();
+                      } catch (err: any) {
+                        setError(err.message || "Failed to trigger SSO login");
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 dark:bg-amber-500/80 hover:bg-amber-700 dark:hover:bg-amber-600 text-white font-extrabold rounded-xl transition-all shadow-md shadow-amber-100/20 active:scale-95 text-xs whitespace-nowrap"
+                  >
+                    Log in to AWS SSO
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-slate-950/40 overflow-hidden flex flex-col">
+          <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-50 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4 flex-1 min-w-[300px]">
+              <div className="relative w-full max-w-md">
+                <HiOutlineSearch
+                  className="absolute left-3.5 top-2.5 text-gray-400 dark:text-slate-500"
+                  size={18}
+                />
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Filter objects by name..."
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50/50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all outline-none font-medium text-xs text-gray-900 dark:text-slate-100"
+                />
+              </div>
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-500/20 uppercase">
+                    {selectedIds.size} selected
+                  </span>
+                  <button
+                    onClick={() => {
+                      Array.from(selectedIds).forEach((id) => {
+                        const obj = objects.find((o) => o.id === id);
+                        if (obj && obj.type !== "folder") handleDownload(obj);
+                      });
+                      setSelectedIds(new Set());
+                    }}
+                    className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors uppercase tracking-wider"
+                  >
+                    <HiOutlineDownload size={14} /> Download
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">
+              {currentFiles.length} items
+            </div>
+          </div>
+
+          <GenericTable
+            items={currentFiles}
+            columns={columns}
+            isLoading={isLoading}
+            rowKey={(obj) => obj.id}
+            onRowClick={(obj) =>
+              obj.type === "folder"
+                ? updatePrefix(obj.id)
+                : toggleSelection(obj.id)
+            }
+            selectedIds={selectedIds}
+            onToggleSelection={toggleSelection}
+            onSelectAll={handleSelectAll}
+            isAllSelected={isAllSelected}
+            sortConfig={sortConfig as any}
+            onSort={handleSort as any}
+            emptyMessage="This folder is empty"
+          />
+        </div>
+
+        <UploadStatus status={uploadStatus} />
+
+        <FavoriteModal
+          isOpen={showFavoriteModal}
+          onClose={() => setShowFavoriteModal(false)}
+          onSave={handleAddFavorite}
+          name={favoriteName}
+          onNameChange={setFavoriteName}
+          folders={availableFolders}
+          selectedFolderId={selectedFolderId}
+          onFolderChange={setSelectedFolderId}
+          isSaving={isSavingFavorite}
+        />
+
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => {
+            setIsShareModalOpen(false);
+            setItemToShare(null);
+          }}
+          object={itemToShare}
+          onGenerate={handleGenerateSharedLink}
+        />
+      </div>
+    </div>
+  );
+}
