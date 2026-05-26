@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   useParams,
   useNavigate,
   useSearchParams,
-  Link,
 } from "react-router-dom";
 import {
   HiOutlineLogout,
@@ -16,7 +15,6 @@ import {
   HiOutlineDocumentText,
   HiOutlineDownload,
   HiOutlineShare,
-  HiOutlineArrowLeft,
   HiOutlineClock,
   HiOutlineSearch,
 } from "react-icons/hi";
@@ -38,7 +36,6 @@ import {
   listRoutes,
   listFolders,
   FavoriteFolder,
-  Route,
   removeRoute,
 } from "../features/favorites/favoritesStore";
 import { getLocalSSOCredentials } from "../features/aws/awsCli";
@@ -50,7 +47,7 @@ import { UploadStatus } from "../features/explorer/components/UploadStatus";
 import { ShareModal } from "../features/explorer/components/ShareModal";
 import { S3Object, SortKey, SortConfig } from "../features/explorer/types";
 import { GenericTable, Column } from "../components/GenericTable";
-import { Breadcrumb, BreadcrumbItem } from "../components/Breadcrumb";
+import { Breadcrumb } from "../components/Breadcrumb";
 
 const formatSize = (bytes?: number): string => {
   if (bytes === undefined || bytes === 0) return "-";
@@ -112,7 +109,7 @@ export default function BucketExplorerPage() {
     searchParams.get("prefix") || "",
   );
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [typeFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "name",
     direction: "asc",
@@ -130,7 +127,7 @@ export default function BucketExplorerPage() {
   const [isSavingFavorite, setIsSavingFavorite] = useState(false);
 
   // Feedback states
-  const [isUploading, setIsUploading] = useState(false);
+  const [, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   // Share modal states

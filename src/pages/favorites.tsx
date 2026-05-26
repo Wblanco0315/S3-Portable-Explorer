@@ -10,7 +10,6 @@ import {
   HiOutlineDuplicate,
   HiOutlineCheck,
   HiOutlineExternalLink,
-  HiOutlineArrowLeft,
   HiOutlineDownload,
   HiOutlineUpload,
 } from "react-icons/hi";
@@ -60,7 +59,7 @@ export default function FavoritesPage() {
   // DnD States
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [movingId, setMovingId] = useState<string | null>(null);
+  const [, setMovingId] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);

@@ -11,7 +11,7 @@ import DownloadsPage from "../pages/downloads";
 import FavoritesPage from "../pages/favorites";
 import SettingsPage from "../pages/settings";
 import { AppLoading } from "../components/AppLoading";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 let routesConfig: RouteObject[] = [
   {

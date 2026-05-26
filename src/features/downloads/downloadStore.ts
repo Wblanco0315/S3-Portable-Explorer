@@ -28,7 +28,7 @@ interface DownloadStore {
     setMaxConcurrent: (count: number) => void;
 }
 
-export const useDownloadStore = create<DownloadStore>((set, get) => ({
+export const useDownloadStore = create<DownloadStore>((set) => ({
     tasks: [],
     maxConcurrentDownloads: 3,
 
@@ -67,7 +67,7 @@ export const useDownloadStore = create<DownloadStore>((set, get) => ({
         set((state) => {
             const newTasks = state.tasks.map((t) => t.id === id ? { 
                 ...t, 
-                status: 'queued', 
+                status: 'queued' as const, 
                 progress: 0, 
                 error: undefined,
                 startTime: Date.now()

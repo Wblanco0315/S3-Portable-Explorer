@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { NavLink, useLocation, useSearchParams } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import NavItem from "./navItem";
 import { HiChevronDown, HiChevronRight } from "react-icons/hi";
 
@@ -38,7 +38,6 @@ export default function LateralNavbar({ items, logo, footer }: LateralNavbarProp
 
 function NavItemComponent({ item }: { item: NavItem }) {
   const location = useLocation();
-  const [searchParams] = useSearchParams();
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Check if this specific item is active (handling both path and search params)

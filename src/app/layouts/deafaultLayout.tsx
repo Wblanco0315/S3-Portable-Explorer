@@ -15,6 +15,8 @@ import { listFolders, FavoriteFolder } from "../../features/favorites/favoritesS
 import { DownloadManager } from "../../features/downloads/downloadManager";
 import { useTheme } from "../ThemeContext";
 import { HiOutlineSun, HiOutlineMoon } from "react-icons/hi";
+import pkg from "../../../package.json";
+import UpdateNotifier from "../../components/updater/UpdateNotifier";
 
 export default function DefaultLayout() {
   const { theme, toggleTheme } = useTheme();
@@ -76,20 +78,17 @@ export default function DefaultLayout() {
   );
 
   const footer = (
-    <div className="flex items-center gap-3 px-2">
-      <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
-        AD
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">Admin User</p>
-        <p className="text-xs text-gray-500 truncate">admin@gravity.io</p>
-      </div>
+    <div className="flex items-center justify-center py-1 px-2">
+      <span className="text-xs text-gray-400 dark:text-slate-500 font-semibold">
+        version {pkg.version}
+      </span>
     </div>
   );
 
   return (
     <div className="flex h-screen w-full bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans transition-colors duration-300">
       <DownloadManager />
+      <UpdateNotifier />
       <LateralNavbar items={menuItems} logo={logo} footer={footer} />
 
       {/* Main Content Area */}

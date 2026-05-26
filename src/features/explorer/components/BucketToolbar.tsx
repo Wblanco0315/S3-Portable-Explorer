@@ -2,7 +2,6 @@ import React from "react";
 import {
   HiOutlineSearch,
   HiOutlineDownload,
-  HiOutlineUpload,
   HiOutlineChevronDown,
   HiOutlineRefresh,
   HiOutlineArrowLeft,

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { 
     HiOutlineDownload, 
     HiOutlineCheckCircle, 
@@ -138,7 +138,7 @@ const DownloadItem = ({
 };
 
 export default function DownloadsPage() {
-    const { tasks, retryTask, removeTask, clearHistory } = useDownloadStore();
+    const { tasks, removeTask, clearHistory } = useDownloadStore();
     const [searchTerm, setSearchTerm] = useState('');
 
     const handleRetry = async (task: DownloadTask) => {

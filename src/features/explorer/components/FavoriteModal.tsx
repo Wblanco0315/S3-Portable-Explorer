@@ -1,5 +1,5 @@
 import React from 'react';
-import { FavoriteFolder } from '../favorites/favoritesStore';
+import { FavoriteFolder } from '../../favorites/favoritesStore';
 
 interface FavoriteModalProps {
     isOpen: boolean;
