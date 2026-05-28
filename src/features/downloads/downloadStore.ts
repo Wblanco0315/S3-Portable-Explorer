@@ -6,7 +6,7 @@ export interface DownloadTask {
     fileName: string;
     bucket: string;
     key: string;
-    status: 'queued' | 'downloading' | 'completed' | 'error' | 'canceled';
+    status: 'queued' | 'downloading' | 'completed' | 'error' | 'canceled' | 'paused';
     progress: number;
     speed: string;
     totalSize: number;
@@ -68,7 +68,7 @@ export const useDownloadStore = create<DownloadStore>((set) => ({
             const newTasks = state.tasks.map((t) => t.id === id ? { 
                 ...t, 
                 status: 'queued' as const, 
-                progress: 0, 
+                progress: t.status === 'paused' || t.status === 'error' ? t.progress : 0,
                 error: undefined,
                 startTime: Date.now()
             } : t);

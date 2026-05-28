@@ -9,10 +9,10 @@ import {
     HiOutlineTrash,
     HiOutlineFolderOpen,
     HiOutlineSearch,
-    HiOutlineDocumentText
+    HiOutlineDocumentText,
+    HiOutlinePause
 } from 'react-icons/hi';
 import { useDownloadStore, DownloadTask } from '../features/downloads/downloadStore';
-import { startS3Download } from '../features/aws/s3Client';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 
 const formatSize = (bytes: number) => {
@@ -32,14 +32,17 @@ const DownloadItem = ({
     task, 
     onDelete, 
     onOpenFolder, 
-    onRetry 
+    onRetry,
+    onPause
 }: { 
     task: DownloadTask; 
     onDelete: (id: string) => void; 
     onOpenFolder: (path: string) => void;
     onRetry: (task: DownloadTask) => void;
+    onPause: (task: DownloadTask) => void;
 }) => {
     const isDownloading = task.status === 'downloading' || task.status === 'queued';
+    const isPaused = task.status === 'paused';
     const isError = task.status === 'error';
     const isCompleted = task.status === 'completed';
 
@@ -47,7 +50,7 @@ const DownloadItem = ({
         <div className="group relative bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl p-4 transition-all hover:shadow-md dark:shadow-slate-950/40 hover:border-blue-100 dark:hover:border-blue-900/50 mb-3">
             <div className="flex items-start gap-4">
                 {/* File Icon */}
-                <div className={`p-3 rounded-lg ${isDownloading ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : isError ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400'}`}>
+                <div className={`p-3 rounded-lg ${isDownloading ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : isPaused ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : isError ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400'}`}>
                     <HiOutlineDocumentText size={24} />
                 </div>
 
@@ -68,15 +71,20 @@ const DownloadItem = ({
                             {formatDate(task.startTime)}
                         </span>
                         <span>•</span>
-                        <span>{task.totalSize > 0 ? formatSize(task.totalSize) : formatSize(task.downloadedSize)}</span>
+                        <span>
+                            {task.totalSize > 0 
+                                ? `${formatSize(task.downloadedSize)} / ${formatSize(task.totalSize)}` 
+                                : formatSize(task.downloadedSize)
+                            }
+                        </span>
                     </div>
 
                     {/* Progress Bar */}
-                    {isDownloading && (
+                    {(isDownloading || isPaused) && (
                         <div className="mt-3">
                             <div className="flex justify-between mb-1 text-[11px] font-medium">
-                                <span className="text-blue-600 dark:text-blue-400">
-                                    {task.status === 'queued' ? 'En cola...' : `Descargando... ${task.progress.toFixed(1)}%`}
+                                <span className={isPaused ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}>
+                                    {task.status === 'queued' ? 'En cola...' : isPaused ? `Pausado... ${task.progress.toFixed(1)}%` : `Descargando... ${task.progress.toFixed(1)}%`}
                                 </span>
                                 {task.status === 'downloading' && (
                                     <span className="text-gray-400 dark:text-slate-500">{task.speed}</span>
@@ -84,22 +92,21 @@ const DownloadItem = ({
                             </div>
                             <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-1.5 overflow-hidden">
                                 <div 
-                                    className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${isPaused ? 'bg-amber-500' : 'bg-blue-600'}`} 
                                     style={{ width: `${task.progress}%` }}
                                 ></div>
                             </div>
                         </div>
                     )}
 
-                    {/* Status Feedback */}
-                    {!isDownloading && (
-                        <div className="mt-2 flex items-center gap-4">
-                            <div className={`flex items-center gap-1.5 text-xs font-medium ${isError ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                                {isError ? <HiOutlineExclamationCircle size={14} /> : <HiOutlineCheckCircle size={14} />}
-                                {isError ? `Error: ${task.error}` : 'Completado'}
-                            </div>
-                            
-                            {isCompleted && (
+                    {/* Status Feedback / Controls */}
+                    <div className="mt-2 flex items-center gap-4">
+                        {isCompleted && (
+                            <>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                    <HiOutlineCheckCircle size={14} />
+                                    Completado
+                                </div>
                                 <button 
                                     onClick={() => onOpenFolder(task.savePath)}
                                     className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
@@ -107,9 +114,15 @@ const DownloadItem = ({
                                     <HiOutlineFolderOpen size={14} />
                                     Mostrar en carpeta
                                 </button>
-                            )}
+                            </>
+                        )}
 
-                            {isError && (
+                        {isError && (
+                            <>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                    <HiOutlineExclamationCircle size={14} />
+                                    Error: {task.error}
+                                </div>
                                 <button 
                                     onClick={() => onRetry(task)}
                                     className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
@@ -117,9 +130,35 @@ const DownloadItem = ({
                                     <HiOutlineRefresh size={14} />
                                     Reintentar
                                 </button>
-                            )}
-                        </div>
-                    )}
+                            </>
+                        )}
+
+                        {isPaused && (
+                            <>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                    <HiOutlineClock size={14} />
+                                    Pausado
+                                </div>
+                                <button 
+                                    onClick={() => onRetry(task)}
+                                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                >
+                                    <HiOutlineRefresh size={14} />
+                                    Reanudar
+                                </button>
+                            </>
+                        )}
+
+                        {isDownloading && (
+                            <button 
+                                onClick={() => onPause(task)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                            >
+                                <HiOutlinePause size={14} />
+                                Pausar
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Actions */}
@@ -138,16 +177,19 @@ const DownloadItem = ({
 };
 
 export default function DownloadsPage() {
-    const { tasks, removeTask, clearHistory } = useDownloadStore();
+    const { tasks, removeTask, clearHistory, retryTask, updateTask } = useDownloadStore();
     const [searchTerm, setSearchTerm] = useState('');
 
     const handleRetry = async (task: DownloadTask) => {
         try {
-            await startS3Download(task.bucket, task.key, task.fileName);
-            removeTask(task.id);
+            retryTask(task.id);
         } catch (err) {
             console.error("Retry failed", err);
         }
+    };
+
+    const handlePause = (task: DownloadTask) => {
+        updateTask(task.id, { status: 'paused', speed: '0 KB/s' });
     };
 
     const handleReveal = async (path: string) => {
@@ -207,6 +249,7 @@ export default function DownloadsPage() {
                                 onDelete={removeTask}
                                 onOpenFolder={handleReveal}
                                 onRetry={handleRetry}
+                                onPause={handlePause}
                             />
                         ))
                     ) : (

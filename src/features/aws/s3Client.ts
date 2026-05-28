@@ -1,9 +1,11 @@
 import { S3Client, ListBucketsCommand, ListObjectsV2Command, GetBucketLocationCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { invoke } from "@tauri-apps/api/core";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { save } from "@tauri-apps/plugin-dialog";
-import { writeFile } from "@tauri-apps/plugin-fs";
+import { writeFile, exists } from "@tauri-apps/plugin-fs";
 import { useDownloadStore } from "../downloads/downloadStore";
+import { getDownloadChunks, saveDownloadChunks, updateDownloadChunkStatus, deleteDownloadChunks } from "../downloads/downloadDatabase";
 
 // We will store the client instance in memory after login
 let s3ClientInstance: S3Client | null = null;
@@ -289,6 +291,9 @@ export const startS3Download = async (bucketName: string, key: string, fileName:
   return taskId;
 };
 
+const CHUNK_SIZE = 16 * 1024 * 1024; // 16 MB Chunks (Optimizado para S3 de alta velocidad)
+const MAX_CONCURRENT_CHUNKS = 12; // 12 descargas concurrentes para saturar el ancho de banda
+
 export const executeDownloadTask = async (taskId: string) => {
   const store = useDownloadStore.getState();
   const task = store.tasks.find(t => t.id === taskId);
@@ -298,53 +303,145 @@ export const executeDownloadTask = async (taskId: string) => {
     store.updateTask(taskId, { status: 'downloading' });
     const url = await generatePresignedUrl(task.bucket, task.key);
 
-    const response = await tauriFetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // 1. Verificar si ya existen bloques en SQLite y si el archivo físico existe en el disco
+    const fileExists = await exists(task.savePath);
+    let chunks = await getDownloadChunks(taskId);
+    let totalSize = task.totalSize;
 
-    const totalSize = parseInt(response.headers.get('content-length') || '0', 10);
-    store.updateTask(taskId, { totalSize });
+    if (!fileExists || chunks.length === 0) {
+      console.log(`[S3Download] Iniciando nueva descarga. Obteniendo tamaño de: ${task.fileName}`);
+      const headRes = await tauriFetch(url, {
+        headers: { 'Range': 'bytes=0-0' }
+      });
+      if (!headRes.ok) throw new Error(`HTTP ${headRes.status}: No se pudo leer el tamaño del objeto`);
 
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("Could not read response body");
+      const contentRange = headRes.headers.get('content-range');
+      if (contentRange) {
+        const parts = contentRange.split('/');
+        totalSize = parseInt(parts[parts.length - 1], 10);
+      } else {
+        totalSize = parseInt(headRes.headers.get('content-length') || '0', 10);
+      }
+      
+      store.updateTask(taskId, { totalSize });
 
-    let downloadedSize = 0;
-    let chunks: Uint8Array[] = [];
-    let lastUpdate = Date.now();
-    let lastSize = 0;
+      // Limpiar registros antiguos de bloques
+      await deleteDownloadChunks(taskId);
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+      // Inicializar el archivo vacío
+      await writeFile(task.savePath, new Uint8Array(0));
 
-      chunks.push(value);
-      downloadedSize += value.length;
+      // Generar mapeo de bloques
+      const chunksCount = Math.ceil(totalSize / CHUNK_SIZE);
+      const dbChunks = [];
+      for (let i = 0; i < chunksCount; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE - 1, totalSize - 1);
+        dbChunks.push({
+          taskId,
+          chunkIndex: i,
+          startByte: start,
+          endByte: end,
+          completed: 0
+        });
+      }
+      await saveDownloadChunks(dbChunks);
+      chunks = await getDownloadChunks(taskId);
+    } else {
+      console.log(`[S3Download] Reanudando descarga para: ${task.fileName}. Bloques encontrados: ${chunks.length}`);
+    }
 
-      const now = Date.now();
-      if (now - lastUpdate > 500) { // Update every 500ms
-        const progress = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
-        const speedBytes = (downloadedSize - lastSize) / ((now - lastUpdate) / 1000);
+    // 2. Identificar bloques pendientes
+    const completedChunks = chunks.filter(c => c.completed === 1);
+    let downloadedSize = completedChunks.reduce((acc, c) => acc + (c.endByte - c.startByte + 1), 0);
+    const pendingChunks = chunks.filter(c => c.completed === 0);
 
-        let speedStr = '';
-        if (speedBytes > 1024 * 1024) speedStr = `${(speedBytes / (1024 * 1024)).toFixed(1)} MB/s`;
-        else if (speedBytes > 1024) speedStr = `${(speedBytes / 1024).toFixed(1)} KB/s`;
-        else speedStr = `${speedBytes.toFixed(0)} B/s`;
+    console.log(`[S3Download] Tamaño: ${totalSize} bytes. Descargado previo: ${downloadedSize} bytes. Pendientes: ${pendingChunks.length} bloques.`);
 
-        store.updateTask(taskId, { progress, downloadedSize, speed: speedStr });
+    const initialProgress = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
+    store.updateTask(taskId, { progress: initialProgress, downloadedSize });
 
-        lastUpdate = now;
-        lastSize = downloadedSize;
+    if (pendingChunks.length > 0) {
+      // 3. Descargar bloques pendientes usando un pool concurrente
+      let chunkQueue = [...pendingChunks];
+      let hasError = false;
+      let downloadError: any = null;
+
+      let lastUpdate = Date.now();
+      let lastSize = downloadedSize;
+
+      const worker = async () => {
+        while (chunkQueue.length > 0 && !hasError) {
+          // Verificar si el usuario pausó la descarga
+          const currentTask = useDownloadStore.getState().tasks.find(t => t.id === taskId);
+          if (!currentTask || currentTask.status !== 'downloading') {
+            console.log(`[S3Download] Descarga detectada como no activa (estado: ${currentTask?.status}). Abortando trabajadores.`);
+            break;
+          }
+
+          const chunk = chunkQueue.shift();
+          if (!chunk) break;
+
+          try {
+            console.log(`[S3Download] Descargando bloque ${chunk.chunkIndex}: ${chunk.startByte}-${chunk.endByte} vía Rust`);
+            const bytesWritten = await invoke<number>("download_chunk", {
+              url,
+              savePath: task.savePath,
+              startByte: chunk.startByte,
+              endByte: chunk.endByte
+            });
+
+            // Marcar fragmento como completado en SQLite
+            await updateDownloadChunkStatus(taskId, chunk.chunkIndex, 1);
+
+            // Actualizar estadísticas del store
+            downloadedSize += bytesWritten;
+            const now = Date.now();
+            if (now - lastUpdate > 500) {
+              const progress = totalSize > 0 ? (downloadedSize / totalSize) * 100 : 0;
+              const speedBytes = (downloadedSize - lastSize) / ((now - lastUpdate) / 1000);
+              
+              let speedStr = '';
+              if (speedBytes > 1024 * 1024) speedStr = `${(speedBytes / (1024 * 1024)).toFixed(1)} MB/s`;
+              else if (speedBytes > 1024) speedStr = `${(speedBytes / 1024).toFixed(1)} KB/s`;
+              else speedStr = `${speedBytes.toFixed(0)} B/s`;
+
+              store.updateTask(taskId, { progress, downloadedSize, speed: speedStr });
+              lastUpdate = now;
+              lastSize = downloadedSize;
+            }
+          } catch (err: any) {
+            hasError = true;
+            downloadError = err;
+            console.error(`[S3Download] Error en bloque ${chunk.chunkIndex}:`, err);
+          }
+        }
+      };
+
+      // Iniciar trabajadores concurrentes
+      const workers = [];
+      const numWorkers = Math.min(MAX_CONCURRENT_CHUNKS, pendingChunks.length);
+      for (let i = 0; i < numWorkers; i++) {
+        workers.push(worker());
+      }
+
+      await Promise.all(workers);
+
+      if (hasError) {
+        throw downloadError || new Error("Error al descargar uno o más bloques");
       }
     }
 
-    // Final merge and write
-    const fullData = new Uint8Array(downloadedSize);
-    let offset = 0;
-    for (const chunk of chunks) {
-      fullData.set(chunk, offset);
-      offset += chunk.length;
+    // 4. Descarga finalizada con éxito
+    const finalTask = useDownloadStore.getState().tasks.find(t => t.id === taskId);
+    if (finalTask && finalTask.status === 'paused') {
+      console.log(`[S3Download] Descarga pausada exitosamente para: ${task.fileName}`);
+      return; // Salir sin borrar bloques de SQLite ni marcar como completado
     }
 
-    await writeFile(task.savePath, fullData);
+    // Borrar metadatos de fragmentos de la base de datos ya que se completó el archivo
+    await deleteDownloadChunks(taskId);
+
     store.updateTask(taskId, {
       status: 'completed',
       progress: 100,
@@ -352,7 +449,6 @@ export const executeDownloadTask = async (taskId: string) => {
       speed: '0 KB/s'
     });
 
-    // Notify user
     if (await ensureNotificationPermission()) {
       sendNotification({
         title: 'Download Complete',
@@ -364,7 +460,6 @@ export const executeDownloadTask = async (taskId: string) => {
     console.error("Download execution failed", err);
     store.updateTask(taskId, { status: 'error', error: err.message });
 
-    // Notify error
     if (await ensureNotificationPermission()) {
       sendNotification({
         title: 'Download Failed',
