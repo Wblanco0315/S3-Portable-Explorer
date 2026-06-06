@@ -1339,8 +1339,8 @@ export default function BucketPage() {
 
   return (
     <div className="h-full w-full flex-1 flex flex-col bg-surface p-4 md:p-6 font-inter text-on-surface transition-colors duration-300">
-      <div className="h-full w-full mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="h-full w-full mx-auto flex flex-col min-h-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
           <div>
             <Breadcrumb
               items={[
@@ -1422,10 +1422,10 @@ export default function BucketPage() {
         )}
 
         {/* Main Explorer Container */}
-        <div className="bg-surface-container border border-outline-variant rounded-lg flex flex-col overflow-hidden">
+        <div className="bg-surface-container border border-outline-variant rounded-lg flex flex-col flex-1 min-h-0 overflow-hidden">
 
           {/* Toolbar */}
-          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-4">
+          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-4 shrink-0">
             <div className="relative w-full max-w-md">
               <HiOutlineSearch
                 className="absolute left-3 top-3 text-on-surface-variant"

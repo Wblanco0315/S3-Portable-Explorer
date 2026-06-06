@@ -161,7 +161,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-margin max-w-5xl mx-auto w-full animate-in fade-in duration-500 text-on-surface">
+    <div className="h-full overflow-y-auto p-margin max-w-5xl mx-auto w-full animate-in fade-in duration-500 text-on-surface">
       <div className="mb-margin">
         <h2 className="font-headline-lg text-headline-lg text-on-surface mb-unit">Configuración</h2>
         <p className="font-body-lg text-body-lg text-on-surface-variant">Gestiona las preferencias locales y conexiones de AWS.</p>

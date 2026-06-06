@@ -259,3 +259,45 @@ select option {
   background-color: var(--surface-container);
   color: var(--on-surface);
 }
+
+/* Custom Checkbox Styles to fit Light/Dark Themes */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 2px;
+  background-color: var(--surface-container-high);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  outline: none;
+}
+
+input[type="checkbox"]:hover {
+  border-color: var(--outline);
+  background-color: var(--surface-container-highest);
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+input[type="checkbox"]:checked::after {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 4.5px;
+  border-left: 2px solid var(--on-primary);
+  border-bottom: 2px solid var(--on-primary);
+  transform: rotate(-45deg) translate(0.5px, -1px);
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}

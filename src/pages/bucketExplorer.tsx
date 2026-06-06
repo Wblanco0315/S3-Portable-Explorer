@@ -576,7 +576,7 @@ export default function BucketExplorerPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-surface p-4 md:p-6 font-inter text-on-surface overflow-hidden transition-colors duration-300">
-      <div className="w-full mx-auto">
+      <div className="w-full mx-auto flex-1 flex flex-col min-h-0">
         <Breadcrumb
           items={[
             { label: getAwsAccountDisplayName(), path: "/buckets" },
@@ -599,7 +599,7 @@ export default function BucketExplorerPage() {
         />
 
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
           <div className="flex items-center gap-3">
             <h1 className="text-headline-lg font-bold text-on-surface tracking-tight flex items-center gap-2">
               <div className="p-1.5 bg-surface-container-high text-primary border border-outline-variant rounded">
@@ -708,8 +708,8 @@ export default function BucketExplorerPage() {
           </div>
         )}
 
-        <div className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
-          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-4 flex-wrap">
+        <div className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col flex-1 min-h-0">
+          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-4 flex-wrap shrink-0">
             <div className="flex items-center gap-4 flex-1 min-w-[300px]">
               <div className="relative w-full max-w-md">
                 <HiOutlineSearch
