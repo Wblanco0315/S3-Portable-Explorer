@@ -6,12 +6,17 @@ import {
   setAwsCredentials,
 } from "../../features/aws/s3Client";
 import { getLocalSSOCredentials } from "../../features/aws/awsCli";
-import { Route } from "../../features/favorites/favoritesStore";
+import { Route, incrementRouteVisit } from "../../features/favorites/favoritesStore";
 
 export function useRouteNavigator() {
   const navigate = useNavigate();
 
   const navigateToRoute = async (route: Route) => {
+    if (route.id) {
+      incrementRouteVisit(route.id).catch((err) =>
+        console.error("Failed to increment route visit count:", err)
+      );
+    }
     const targetPath = `/buckets/${route.bucket}?prefix=${encodeURIComponent(route.prefix)}`;
     const currentProfile = getCurrentActiveProfile();
     const targetProfile = route.profile || "default";

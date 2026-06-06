@@ -6,6 +6,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile, exists } from "@tauri-apps/plugin-fs";
 import { useDownloadStore } from "../downloads/downloadStore";
 import { getDownloadChunks, saveDownloadChunks, updateDownloadChunkStatus, deleteDownloadChunks } from "../downloads/downloadDatabase";
+import { getDb } from "../../shared/hooks/useDatabase";
 
 // We will store the client instance in memory after login
 let s3ClientInstance: S3Client | null = null;
@@ -359,6 +360,17 @@ export const startS3Download = async (bucketName: string, key: string, fileName:
   });
 
   if (!savePath) return;
+
+  // Log action
+  try {
+    const db = await getDb();
+    await db.execute(
+      "INSERT INTO action_logs (action_type, details) VALUES ($1, $2)",
+      ["download", `Downloaded backup/file '${fileName}' from s3://${bucketName}/${key}`]
+    );
+  } catch (err) {
+    console.error("Failed to log download action:", err);
+  }
 
   const taskId = `${bucketName}-${key}-${Date.now()}`;
   const store = useDownloadStore.getState();

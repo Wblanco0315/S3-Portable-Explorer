@@ -26,7 +26,7 @@ import { useDatabase } from "../shared/hooks/useDatabase";
 
 export default function BucketPage() {
   const navigate = useNavigate();
-  const { getSetting, saveSetting } = useDatabase();
+  const { getSetting, saveSetting, logAction } = useDatabase();
 
   // Basic States
   const [isAuthenticated, setIsAuthenticated] = useState(isAwsAuthenticated());
@@ -259,6 +259,9 @@ export default function BucketPage() {
     if (isAuthenticated && buckets.length === 0) {
       handleRefresh();
     }
+    
+    // Log visit action
+    logAction("visit", "Visited Buckets list");
   }, []);
 
   // Automatic SSO connect on refresh if using local CLI SSO profile

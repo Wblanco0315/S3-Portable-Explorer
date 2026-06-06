@@ -41,6 +41,7 @@ import {
 } from "../features/favorites/favoritesStore";
 import { getLocalSSOCredentials } from "../features/aws/awsCli";
 import { useDownloadStore } from "../features/downloads/downloadStore";
+import { useDatabase } from "../shared/hooks/useDatabase";
 
 // Atomic Components
 import { FavoriteModal } from "../features/explorer/components/FavoriteModal";
@@ -98,6 +99,7 @@ const getIconForType = (type: string) => {
 export default function BucketExplorerPage() {
   const { bucketName } = useParams();
   const navigate = useNavigate();
+  const { logAction } = useDatabase();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Explorer State
@@ -307,6 +309,9 @@ export default function BucketExplorerPage() {
       await fetchObjects();
       await checkIsFavorite();
       await loadFolders();
+      
+      // Log visit action
+      logAction("visit", `Visited s3://${bucketName}/${currentPrefix}`);
     };
 
     initExplorer();
@@ -329,6 +334,9 @@ export default function BucketExplorerPage() {
       setShowFavoriteModal(false);
       setFavoriteName("");
       setSelectedFolderId(null);
+
+      // Log favorite action
+      logAction("favorite", `Marked s3://${bucketName}/${currentPrefix} as favorite '${favoriteName.trim()}'`);
     } catch (err: any) {
       console.error("Failed to add favorite", err);
       alert("Error saving favorite: " + err.message);
