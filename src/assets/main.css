@@ -228,3 +228,34 @@
   font-weight: 500;
   line-height: 1.4;
 }
+
+/* Custom Scrollbar Styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-container-lowest);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--outline-variant);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline);
+}
+
+/* Firefox compatibility */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline-variant) var(--surface-container-lowest);
+}
+
+/* Global Select Options Style */
+select option {
+  background-color: var(--surface-container);
+  color: var(--on-surface);
+}

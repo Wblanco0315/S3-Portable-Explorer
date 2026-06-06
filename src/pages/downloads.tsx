@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { 
-    HiOutlineDownload, 
-    HiOutlineCheckCircle, 
+import {
+    HiOutlineDownload,
+    HiOutlineCheckCircle,
     HiOutlineExclamationCircle,
     HiOutlineX,
     HiOutlineRefresh,
@@ -28,15 +28,15 @@ const formatDate = (timestamp: number) => {
     return date.toLocaleString();
 };
 
-const DownloadItem = ({ 
-    task, 
-    onDelete, 
-    onOpenFolder, 
+const DownloadItem = ({
+    task,
+    onDelete,
+    onOpenFolder,
     onRetry,
     onPause
-}: { 
-    task: DownloadTask; 
-    onDelete: (id: string) => void; 
+}: {
+    task: DownloadTask;
+    onDelete: (id: string) => void;
     onOpenFolder: (path: string) => void;
     onRetry: (task: DownloadTask) => void;
     onPause: (task: DownloadTask) => void;
@@ -72,8 +72,8 @@ const DownloadItem = ({
                         </span>
                         <span>•</span>
                         <span>
-                            {task.totalSize > 0 
-                                ? `${formatSize(task.downloadedSize)} / ${formatSize(task.totalSize)}` 
+                            {task.totalSize > 0
+                                ? `${formatSize(task.downloadedSize)} / ${formatSize(task.totalSize)}`
                                 : formatSize(task.downloadedSize)
                             }
                         </span>
@@ -91,8 +91,8 @@ const DownloadItem = ({
                                 )}
                             </div>
                             <div className="w-full bg-surface-container rounded-sm h-1.5 overflow-hidden border border-outline-variant/30">
-                                <div 
-                                    className={`h-1.5 rounded-sm transition-all duration-300 ${isPaused ? 'bg-secondary' : 'bg-primary'}`} 
+                                <div
+                                    className={`h-1.5 rounded-sm transition-all duration-300 ${isPaused ? 'bg-secondary' : 'bg-primary'}`}
                                     style={{ width: `${task.progress}%` }}
                                 ></div>
                             </div>
@@ -107,7 +107,7 @@ const DownloadItem = ({
                                     <HiOutlineCheckCircle size={14} />
                                     Completado
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => onOpenFolder(task.savePath)}
                                     className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
@@ -123,7 +123,7 @@ const DownloadItem = ({
                                     <HiOutlineExclamationCircle size={14} />
                                     Error: {task.error}
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => onRetry(task)}
                                     className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
@@ -139,7 +139,7 @@ const DownloadItem = ({
                                     <HiOutlineClock size={14} />
                                     Pausado
                                 </div>
-                                <button 
+                                <button
                                     onClick={() => onRetry(task)}
                                     className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
@@ -150,7 +150,7 @@ const DownloadItem = ({
                         )}
 
                         {isDownloading && (
-                            <button 
+                            <button
                                 onClick={() => onPause(task)}
                                 className="flex items-center gap-1 text-label-sm font-mono font-semibold text-secondary hover:underline cursor-pointer"
                             >
@@ -163,7 +163,7 @@ const DownloadItem = ({
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
+                    <button
                         onClick={() => onDelete(task.id)}
                         className="p-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
                         title="Eliminar del historial"
@@ -201,14 +201,14 @@ export default function DownloadsPage() {
     };
 
     const filteredTasks = useMemo(() => {
-        return tasks.filter(t => 
+        return tasks.filter(t =>
             t.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             t.bucket.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [tasks, searchTerm]);
 
     return (
-        <div className="min-h-screen bg-surface p-4 md:p-6 font-inter text-on-surface overflow-y-auto transition-colors duration-300">
+        <div className="flex flex-1 bg-surface p-4 md:p-6 font-inter text-on-surface overflow-y-auto transition-colors duration-300">
             <div className="max-w-3xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -216,7 +216,7 @@ export default function DownloadsPage() {
                         <h1 className="text-headline-lg font-bold text-on-surface">Historial de Descargas</h1>
                         <p className="text-body-md text-on-surface-variant mt-1">Gestiona tus archivos descargados y el progreso actual.</p>
                     </div>
-                    <button 
+                    <button
                         onClick={clearHistory}
                         className="flex items-center justify-center gap-2 px-4 py-2 text-body-md font-medium text-error bg-surface-container border border-error/20 rounded hover:bg-error-container/25 transition-colors cursor-pointer"
                     >
@@ -243,9 +243,9 @@ export default function DownloadsPage() {
                 <div className="space-y-1 pb-10">
                     {filteredTasks.length > 0 ? (
                         filteredTasks.map(task => (
-                            <DownloadItem 
-                                key={task.id} 
-                                task={task} 
+                            <DownloadItem
+                                key={task.id}
+                                task={task}
                                 onDelete={removeTask}
                                 onOpenFolder={handleReveal}
                                 onRetry={handleRetry}

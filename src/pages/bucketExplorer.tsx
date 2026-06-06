@@ -83,15 +83,15 @@ const inferType = (key: string): string => {
 const getIconForType = (type: string) => {
   switch (type) {
     case "folder":
-      return <HiOutlineFolder className="text-amber-500" size={22} />;
+      return <HiOutlineFolder className="text-primary" size={22} />;
     case "image":
-      return <HiOutlinePhotograph className="text-blue-500" size={22} />;
+      return <HiOutlinePhotograph className="text-tertiary" size={22} />;
     case "code":
-      return <HiOutlineCode className="text-purple-500" size={22} />;
+      return <HiOutlineCode className="text-secondary" size={22} />;
     case "document":
-      return <HiOutlineDocumentText className="text-gray-500" size={22} />;
+      return <HiOutlineDocumentText className="text-on-surface-variant" size={22} />;
     default:
-      return <HiOutlineDocument className="text-gray-400" size={22} />;
+      return <HiOutlineDocument className="text-on-surface-variant/70" size={22} />;
   }
 };
 
@@ -244,6 +244,7 @@ export default function BucketExplorerPage() {
         alert("Error removing from favorites");
       }
     } else {
+      await loadFolders();
       setShowFavoriteModal(true);
     }
   };
