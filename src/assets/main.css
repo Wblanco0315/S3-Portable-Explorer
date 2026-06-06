@@ -301,3 +301,20 @@ input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
+
+/* Custom Route Change Transition */
+@keyframes routeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.route-transition {
+  animation: routeFadeIn 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

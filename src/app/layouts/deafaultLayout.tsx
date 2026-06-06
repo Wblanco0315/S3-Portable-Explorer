@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import LateralNavbar from "../../components/navbar/lateralNavbar";
 import NavItem from "../../components/navbar/navItem";
 import {
@@ -19,6 +19,7 @@ import pkg from "../../../package.json";
 import UpdateNotifier from "../../components/updater/UpdateNotifier";
 
 export default function DefaultLayout() {
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { tasks } = useDownloadStore();
   const activeDownloadsCount = tasks.filter(t => t.status === 'downloading' || t.status === 'queued').length;
@@ -124,7 +125,9 @@ export default function DefaultLayout() {
         </header>
 
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <Outlet />
+          <div key={location.pathname} className="flex-1 flex flex-col min-h-0 overflow-hidden route-transition">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -91,16 +91,36 @@ export function GenericTable<T>({
         </thead>
         <tbody className="divide-y divide-outline-variant/30">
           {isLoading ? (
-            <tr>
-              <td colSpan={columns.length + (onSelectAll ? 1 : 0)}>
-                <div className="py-20 text-center">
-                  <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                  <p className="text-on-surface-variant font-medium text-label-sm uppercase tracking-wider font-mono">
-                    Loading...
-                  </p>
-                </div>
-              </td>
-            </tr>
+            Array.from({ length: 6 }).map((_, rowIndex) => (
+              <tr key={`skeleton-row-${rowIndex}`} className="border-b border-outline-variant/10">
+                {onSelectAll && (
+                  <td className="px-4 py-4.5 w-10">
+                    <div className="flex items-center justify-center">
+                      <div className="w-3.5 h-3.5 bg-surface-container-highest rounded-sm animate-pulse" />
+                    </div>
+                  </td>
+                )}
+                {columns.map((col, colIndex) => {
+                  // Custom widths for different columns to simulate real content distribution
+                  const widths = ["w-36 sm:w-56", "w-16", "w-28", "w-20", "w-24", "w-8"];
+                  const widthClass = widths[colIndex % widths.length];
+                  return (
+                    <td
+                      key={`skeleton-cell-${rowIndex}-${col.key}`}
+                      className="px-4 py-4.5"
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* Mock icon on first column */}
+                        {colIndex === 0 && (
+                          <div className="w-[22px] h-[22px] bg-surface-container-highest rounded-sm animate-pulse shrink-0" />
+                        )}
+                        <div className={`h-4 bg-surface-container-highest rounded animate-pulse ${widthClass}`} />
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))
           ) : items.length === 0 ? (
             <tr>
               <td colSpan={columns.length + (onSelectAll ? 1 : 0)}>
