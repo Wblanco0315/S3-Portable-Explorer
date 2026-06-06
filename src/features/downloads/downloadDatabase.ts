@@ -23,6 +23,17 @@ export const getDownloadDb = async () => {
                 savePath TEXT NOT NULL
             )
         `);
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS download_chunks (
+                taskId TEXT NOT NULL,
+                chunkIndex INTEGER NOT NULL,
+                startByte INTEGER NOT NULL,
+                endByte INTEGER NOT NULL,
+                completed INTEGER DEFAULT 0,
+                PRIMARY KEY (taskId, chunkIndex)
+            )
+        `);
     }
     return db;
 };
@@ -67,10 +78,63 @@ export const getDownloadHistory = async (): Promise<DownloadTask[]> => {
 
 export const deleteDownloadTask = async (id: string) => {
     const database = await getDownloadDb();
+    // Primero borramos sus bloques para no dejar huérfanos
+    await database.execute("DELETE FROM download_chunks WHERE taskId = $1", [id]);
     return await database.execute("DELETE FROM downloads WHERE id = $1", [id]);
 };
 
 export const clearDownloadHistory = async () => {
     const database = await getDownloadDb();
+    // Borrar bloques de las descargas que serán eliminadas del historial
+    await database.execute(`
+        DELETE FROM download_chunks 
+        WHERE taskId IN (SELECT id FROM downloads WHERE status NOT IN ('downloading', 'queued'))
+    `);
     return await database.execute("DELETE FROM downloads WHERE status NOT IN ('downloading', 'queued')");
+};
+
+export interface DbChunk {
+    taskId: string;
+    chunkIndex: number;
+    startByte: number;
+    endByte: number;
+    completed: number;
+}
+
+export const saveDownloadChunks = async (chunks: DbChunk[]) => {
+    const database = await getDownloadDb();
+    for (const chunk of chunks) {
+        await database.execute(`
+            INSERT INTO download_chunks (taskId, chunkIndex, startByte, endByte, completed)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT(taskId, chunkIndex) DO UPDATE SET
+                completed = excluded.completed
+        `, [chunk.taskId, chunk.chunkIndex, chunk.startByte, chunk.endByte, chunk.completed]);
+    }
+};
+
+export const updateDownloadChunkStatus = async (taskId: string, chunkIndex: number, completed: number) => {
+    const database = await getDownloadDb();
+    await database.execute(`
+        UPDATE download_chunks SET completed = $1 WHERE taskId = $2 AND chunkIndex = $3
+    `, [completed, taskId, chunkIndex]);
+};
+
+export const getDownloadChunks = async (taskId: string): Promise<DbChunk[]> => {
+    const database = await getDownloadDb();
+    const rows = await database.select<any[]>(`
+        SELECT * FROM download_chunks WHERE taskId = $1 ORDER BY chunkIndex ASC
+    `, [taskId]);
+    return rows.map(row => ({
+        taskId: row.taskId,
+        chunkIndex: row.chunkIndex,
+        startByte: row.startByte,
+        endByte: row.endByte,
+        completed: row.completed
+    }));
+};
+
+export const deleteDownloadChunks = async (taskId: string) => {
+    const database = await getDownloadDb();
+    await database.execute("DELETE FROM download_chunks WHERE taskId = $1", [taskId]);
 };

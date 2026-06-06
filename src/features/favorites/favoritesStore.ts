@@ -57,6 +57,9 @@ const getDb = async () => {
         try {
             await db.execute("ALTER TABLE favorites ADD COLUMN profile TEXT NOT NULL DEFAULT 'default'");
         } catch (e) {}
+        try {
+            await db.execute("ALTER TABLE favorites ADD COLUMN visit_count INTEGER DEFAULT 0");
+        } catch (e) {}
     }
     return db;
 };
@@ -114,6 +117,21 @@ export const removeRoute = async (id: number) => {
 export const listRoutes = async (): Promise<Route[]> => {
     const database = await getDb();
     return await database.select<Route[]>("SELECT * FROM favorites ORDER BY created_at DESC");
+};
+
+export const incrementRouteVisit = async (routeId: number) => {
+    const database = await getDb();
+    return await database.execute(
+        "UPDATE favorites SET visit_count = COALESCE(visit_count, 0) + 1 WHERE id = $1",
+        [routeId]
+    );
+};
+
+export const getTopVisitedRoutes = async (): Promise<Route[]> => {
+    const database = await getDb();
+    return await database.select<Route[]>(
+        "SELECT * FROM favorites ORDER BY COALESCE(visit_count, 0) DESC, created_at DESC LIMIT 10"
+    );
 };
 
 // Export/Import Types

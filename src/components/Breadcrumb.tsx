@@ -30,25 +30,25 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
     const navigate = useNavigate();
 
     return (
-        <div className={`flex items-center gap-2 text-[11px] font-bold text-gray-400 dark:text-slate-500 mb-5 bg-white dark:bg-slate-900 p-2 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm w-fit ${className}`}>
+        <div className={`flex items-center gap-2 text-label-sm font-medium text-on-surface-variant mb-5 bg-surface-container-low p-2 rounded border border-outline-variant w-fit ${className}`}>
             {showBackButton && (
                 <button 
                     onClick={onBackClick || (() => navigate(-1))} 
-                    className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded transition-colors text-gray-500 dark:text-slate-400"
+                    className="p-1 hover:bg-surface-container-highest rounded transition-colors text-on-surface-variant hover:text-on-surface cursor-pointer"
                 >
                     <HiOutlineArrowLeft size={14} />
                 </button>
             )}
             
-            <div className="flex items-center gap-1.5 uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 uppercase tracking-wider font-mono">
                 {items.map((item, idx) => (
                     <React.Fragment key={idx}>
-                        {idx > 0 && <span className="text-gray-300 select-none">/</span>}
+                        {idx > 0 && <span className="text-outline select-none">/</span>}
                         
                         {item.path ? (
                             <Link
                                 to={item.path}
-                                className={`px-1.5 py-0.5 rounded transition-all hover:bg-gray-100 dark:hover:bg-slate-800 ${item.active ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : ''}`}
+                                className={`px-1.5 py-0.5 rounded border border-transparent transition-all hover:bg-surface-container-highest/50 hover:text-on-surface ${item.active ? 'text-primary bg-surface-container-high border-outline-variant font-bold' : ''}`}
                             >
                                 {item.label}
                             </Link>
@@ -58,9 +58,9 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                                 onDragOver={item.onDragOver}
                                 onDragLeave={item.onDragLeave}
                                 onDrop={item.onDrop}
-                                className={`cursor-pointer px-1.5 py-0.5 rounded transition-all 
-                                    ${item.active ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10' : 'hover:bg-gray-100 dark:hover:bg-slate-800'}
-                                    ${item.isDropTarget ? 'bg-indigo-600 text-white shadow-lg scale-110' : ''}
+                                className={`cursor-pointer px-1.5 py-0.5 rounded border border-transparent transition-all 
+                                    ${item.active ? 'text-primary bg-surface-container-high border-outline-variant font-bold' : 'hover:bg-surface-container-highest/50 hover:text-on-surface'}
+                                    ${item.isDropTarget ? 'bg-primary text-on-primary scale-105' : ''}
                                 `}
                             >
                                 {item.label}

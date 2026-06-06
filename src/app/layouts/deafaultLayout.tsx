@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import LateralNavbar from "../../components/navbar/lateralNavbar";
 import NavItem from "../../components/navbar/navItem";
 import {
@@ -19,6 +19,7 @@ import pkg from "../../../package.json";
 import UpdateNotifier from "../../components/updater/UpdateNotifier";
 
 export default function DefaultLayout() {
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { tasks } = useDownloadStore();
   const activeDownloadsCount = tasks.filter(t => t.status === 'downloading' || t.status === 'queued').length;
@@ -72,40 +73,40 @@ export default function DefaultLayout() {
   ];
 
   const logo = (
-    <span className="text-xl font-black bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+    <span className="text-xl font-geist font-bold text-primary">
       S3 Portable Explorer
     </span>
   );
 
   const footer = (
     <div className="flex items-center justify-center py-1 px-2">
-      <span className="text-xs text-gray-400 dark:text-slate-500 font-semibold">
+      <span className="text-label-sm text-on-surface-variant font-medium">
         version {pkg.version}
       </span>
     </div>
   );
 
   return (
-    <div className="flex h-screen w-full bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 font-sans transition-colors duration-300">
+    <div className="flex h-screen w-full bg-surface text-on-surface font-inter transition-colors duration-300">
       <DownloadManager />
       <UpdateNotifier />
       <LateralNavbar items={menuItems} logo={logo} footer={footer} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-8">
+        <header className="h-16 bg-surface-container-low border-b border-outline-variant flex items-center justify-between px-8">
           <div className="flex items-center gap-4">
             <Breadcrumbs />
           </div>
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={toggleTheme}
-              className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+              className="p-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {theme === 'dark' ? <HiOutlineSun size={20} /> : <HiOutlineMoon size={20} />}
             </button>
-            <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+            <button className="p-2 text-on-surface-variant hover:text-on-surface cursor-pointer">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -123,8 +124,10 @@ export default function DefaultLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div key={location.pathname} className="flex-1 flex flex-col min-h-0 overflow-hidden route-transition">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

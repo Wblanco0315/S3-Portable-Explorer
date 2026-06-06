@@ -1,8 +1,73 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use std::fs::OpenOptions;
+use std::io::{Seek, SeekFrom, Write};
+use std::sync::{Mutex, OnceLock};
+
+static FILE_WRITE_MUTEX: Mutex<()> = Mutex::new(());
+static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+fn get_http_client() -> &'static reqwest::Client {
+    HTTP_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .tcp_keepalive(Some(std::time::Duration::from_secs(60)))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new())
+    })
+}
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
+
+#[tauri::command]
+async fn download_chunk(
+    url: String,
+    save_path: String,
+    start_byte: u64,
+    end_byte: u64,
+) -> Result<u64, String> {
+    // 1. Send HTTP request with Range header using the global shared keepalive client
+    let client = get_http_client();
+    let res = client
+        .get(&url)
+        .header("Range", format!("bytes={}-{}", start_byte, end_byte))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !res.status().is_success() {
+        return Err(format!("HTTP status error: {}", res.status()));
+    }
+
+    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
+    let len = bytes.len() as u64;
+
+    // 2. Lock and write to file at specific offset
+    let join_result = tauri::async_runtime::spawn_blocking(move || {
+        let _lock = FILE_WRITE_MUTEX.lock().unwrap();
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&save_path)
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+
+        file.seek(SeekFrom::Start(start_byte))
+            .map_err(|e| format!("Failed to seek file: {}", e))?;
+
+        file.write_all(&bytes)
+            .map_err(|e| format!("Failed to write file: {}", e))?;
+
+        Ok::<u64, String>(len)
+    })
+    .await;
+
+    match join_result {
+        Ok(inner_res) => inner_res,
+        Err(e) => Err(format!("Thread join error: {}", e)),
+    }
+}
+
 
 use tauri_plugin_sql::{Migration, MigrationKind};
 
@@ -51,7 +116,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![greet, download_chunk])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

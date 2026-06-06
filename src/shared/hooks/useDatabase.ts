@@ -5,6 +5,15 @@ let dbInstance: Database | null = null;
 export const getDb = async () => {
   if (!dbInstance) {
     dbInstance = await Database.load("sqlite:s3explorer.db");
+    // Initialize action_logs table
+    await dbInstance.execute(`
+      CREATE TABLE IF NOT EXISTS action_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action_type TEXT NOT NULL,
+        details TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
   }
   return dbInstance;
 };
@@ -69,6 +78,29 @@ export const useDatabase = () => {
     );
   };
 
+  const logAction = async (actionType: string, details: string) => {
+    try {
+      const db = await getDb();
+      await db.execute(
+        "INSERT INTO action_logs (action_type, details) VALUES ($1, $2)",
+        [actionType, details]
+      );
+      // Keep only last 50 action logs
+      await db.execute(
+        "DELETE FROM action_logs WHERE id NOT IN (SELECT id FROM action_logs ORDER BY created_at DESC LIMIT 50)"
+      );
+    } catch (err) {
+      console.error("Failed to log action:", err);
+    }
+  };
+
+  const getActionLogs = async () => {
+    const db = await getDb();
+    return await db.select<{ id: number; action_type: string; details: string; created_at: string }[]>(
+      "SELECT id, action_type, details, created_at FROM action_logs ORDER BY created_at DESC LIMIT 50"
+    );
+  };
+
   return {
     getSetting,
     saveSetting,
@@ -77,5 +109,7 @@ export const useDatabase = () => {
     addFavorite,
     removeFavorite,
     getFavorites,
+    logAction,
+    getActionLogs,
   };
 };

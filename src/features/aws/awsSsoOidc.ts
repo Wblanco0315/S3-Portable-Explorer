@@ -90,7 +90,7 @@ export const pollForOidcToken = async (
   intervalSeconds: number,
   ssoRegion: string,
   onProgress?: (message: string) => void
-): Promise<string> => {
+): Promise<{ accessToken: string; expiresIn: number }> => {
   const oidcClient = new SSOOIDCClient({ region: ssoRegion });
   const pollIntervalMs = intervalSeconds * 1000;
   
@@ -109,7 +109,10 @@ export const pollForOidcToken = async (
       
       if (tokenRes.accessToken) {
         console.log("[SSO-OIDC] Access token retrieved successfully.");
-        return tokenRes.accessToken;
+        return {
+          accessToken: tokenRes.accessToken,
+          expiresIn: tokenRes.expiresIn || 28800 // Default 8 hours (28800s)
+        };
       }
       throw new Error("Token response did not include an access token.");
     } catch (err: any) {

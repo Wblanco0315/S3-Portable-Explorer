@@ -10,8 +10,6 @@ import BucketExplorerPage from "../pages/bucketExplorer";
 import DownloadsPage from "../pages/downloads";
 import FavoritesPage from "../pages/favorites";
 import SettingsPage from "../pages/settings";
-import { AppLoading } from "../components/AppLoading";
-import { useState, useEffect } from "react";
 
 let routesConfig: RouteObject[] = [
   {
@@ -53,19 +51,7 @@ let routesConfig: RouteObject[] = [
 ];
 
 export default function AppRoutes() {
-  const [isLoading, setIsLoading] = useState(true);
   const router = createBrowserRouter(routesConfig);
 
-  useEffect(() => {
-    // Simulate initial app setup/auth check
-    const timer = setTimeout(() => setIsLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <>
-      {isLoading && <AppLoading />}
-      <RouterProvider router={router} />
-    </>
-  );
+  return <RouterProvider router={router} />;
 }

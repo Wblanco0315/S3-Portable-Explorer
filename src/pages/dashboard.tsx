@@ -1,42 +1,85 @@
 import React, { useEffect, useState } from "react";
-import { HiOutlineChartBar, HiOutlineClock, HiOutlineLink, HiOutlineDownload, HiOutlineDatabase } from "react-icons/hi";
+import { HiOutlineChartBar, HiOutlineClock, HiOutlineLink, HiOutlineDownload, HiOutlineDatabase, HiOutlineStar, HiChevronLeft, HiChevronRight } from "react-icons/hi";
 import { useDatabase } from "../shared/hooks/useDatabase";
-import { listRoutes, Route } from "../features/favorites/favoritesStore";
+import { getTopVisitedRoutes, Route } from "../features/favorites/favoritesStore";
 import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
+import { useDownloadStore } from "../features/downloads/downloadStore";
 import { Link } from "react-router-dom";
 
 export default function DashboardPage() {
   const { navigateToRoute } = useRouteNavigator();
-  const { getRecentRoutes } = useDatabase();
-  const [recent, setRecent] = useState<{path: string; visited_at: string}[]>([]);
+  const { getActionLogs } = useDatabase();
+  const { tasks, initialize: initDownloads } = useDownloadStore();
+
+  const [recentActions, setRecentActions] = useState<{ id: number; action_type: string; details: string; created_at: string }[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
+
+  const totalItems = recentActions.length;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const activePage = currentPage > totalPages ? 1 : currentPage;
+  
+  const startIndex = (activePage - 1) * pageSize;
+  const paginatedActions = recentActions.slice(startIndex, startIndex + pageSize);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [actions, rt] = await Promise.all([getActionLogs(), getTopVisitedRoutes()]);
+      setRecentActions(actions);
+      setRoutes(rt);
+    } catch (error) {
+      console.error("Failed to load dashboard data", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [r, rt] = await Promise.all([getRecentRoutes(), listRoutes()]);
-        setRecent(r);
-        setRoutes(rt.slice(0, 5)); // Show only 5 most recent
-      } catch (error) {
-        console.error("Failed to load dashboard data", error);
-      }
-    };
     loadData();
+    if (tasks.length === 0) {
+      initDownloads();
+    }
   }, []);
 
+  // Compute real metrics
+  const completedDownloads = tasks.filter(t => t.status === "completed");
+  const totalDownloadsCount = completedDownloads.length;
+  
+  const totalBytes = completedDownloads.reduce((sum, t) => sum + (t.totalSize || 0), 0);
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+  const storageVal = formatBytes(totalBytes);
+
+  const activeBucketsCount = new Set(routes.map(r => r.bucket)).size;
+
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 route-transition">
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-slate-100 dark:to-slate-400 bg-clip-text text-transparent">
+          <h1 className="text-headline-lg font-bold text-on-surface">
             Welcome Back
           </h1>
-          <p className="text-gray-500 dark:text-slate-400 mt-1">Here's what's happening with your S3 backups today.</p>
+          <p className="text-on-surface-variant text-body-md mt-1">Here's what's happening with your S3 backups today.</p>
         </div>
         <Link 
           to="/buckets"
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium text-sm rounded-lg shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium text-body-md rounded border border-transparent hover:bg-primary/95 transition-all duration-200 cursor-pointer"
         >
           <HiOutlineDatabase className="w-5 h-5" />
           Explore Buckets
@@ -44,110 +87,177 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard 
-          title="Total Downloads" 
-          value="1,284" 
-          trend="+12% this week"
-          icon={<HiOutlineDownload className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />}
-          color="bg-indigo-50 dark:bg-indigo-500/10"
+          title="Completed Downloads" 
+          value={String(totalDownloadsCount)} 
+          trend={`${tasks.length} in history`}
+          icon={<HiOutlineDownload className="w-5 h-5 text-primary" />}
         />
         <StatCard 
-          title="Storage Accessed" 
-          value="84.2 GB" 
-          trend="+5.4% this week"
-          icon={<HiOutlineChartBar className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />}
-          color="bg-emerald-50 dark:bg-emerald-500/10"
+          title="Storage Downloaded" 
+          value={storageVal} 
+          trend="Total transferred"
+          icon={<HiOutlineChartBar className="w-5 h-5 text-tertiary" />}
         />
         <StatCard 
-          title="Active Buckets" 
-          value="12" 
-          trend="No change"
-          icon={<HiOutlineDatabase className="w-6 h-6 text-amber-600 dark:text-amber-400" />}
-          color="bg-amber-50 dark:bg-amber-500/10"
+          title="Active Buckets (Routes)" 
+          value={String(activeBucketsCount)} 
+          trend={`${routes.length} saved paths`}
+          icon={<HiOutlineDatabase className="w-5 h-5 text-secondary" />}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Favorites Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 p-6 flex flex-col transition-colors">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-lg">
+        <div className="bg-surface-container-low rounded-lg border border-outline-variant p-4 flex flex-col h-[480px] transition-colors">
+          <div className="flex items-center gap-3 mb-4 shrink-0">
+            <div className="p-2 bg-surface-container-high text-primary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineLink className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100">My Routes</h2>
+            <h2 className="text-headline-md text-on-surface font-semibold">My Routes (Top Visited)</h2>
           </div>
           
-          <div className="flex-1">
+          <div className="flex-1 overflow-y-auto pr-1 min-h-0">
             {routes.length > 0 ? (
-              <ul className="space-y-3">
+              <ul className="space-y-2">
                 {routes.map((rt) => (
                   <div
                     key={rt.id}
                     onClick={() => navigateToRoute(rt)}
-                    className="group flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800/50 border border-transparent hover:border-gray-100 dark:hover:border-slate-700 transition-colors cursor-pointer mb-2"
+                    className="group flex items-center justify-between p-2.5 rounded hover:bg-surface-container-highest/50 border border-transparent hover:border-outline-variant/30 transition-colors cursor-pointer mb-2"
                   >
-                    <div className="flex items-center gap-3">
-                      <HiOutlineLink className="text-gray-400 dark:text-slate-500 group-hover:text-indigo-500 transition-colors" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-gray-800 dark:text-slate-200">{rt.name}</p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <HiOutlineLink className="text-on-surface-variant group-hover:text-primary transition-colors shrink-0" />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-body-md font-semibold text-on-surface truncate">{rt.name}</p>
                           {rt.profile && (
-                            <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 rounded text-[9px] font-extrabold border border-gray-200 dark:border-slate-700 uppercase tracking-wider">
+                            <span className="px-1.5 py-0.5 bg-surface-container-high text-on-surface-variant rounded-sm text-label-sm font-mono border border-outline-variant uppercase tracking-wider shrink-0">
                               {rt.profile}
                             </span>
                           )}
+                          {(rt as any).visit_count > 0 && (
+                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded-sm text-label-sm font-mono border border-primary/20 shrink-0" title={`${(rt as any).visit_count} visitas`}>
+                              {(rt as any).visit_count} visits
+                            </span>
+                          )}
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-slate-500 truncate max-w-[200px]">s3://{rt.bucket}/{rt.prefix}</p>
+                        <p className="text-label-sm text-on-surface-variant truncate font-mono mt-0.5">s3://{rt.bucket}/{rt.prefix}</p>
                       </div>
                     </div>
                   </div>
                 ))}
               </ul>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl">
-                <HiOutlineLink className="w-8 h-8 text-gray-300 dark:text-slate-700 mb-2" />
-                <p className="text-sm text-gray-500 dark:text-slate-500 font-medium">No routes yet</p>
-                <p className="text-xs text-gray-400 dark:text-slate-600 mt-1">Add paths to "My Routes" in the explorer to see them here.</p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline-variant rounded">
+                <HiOutlineLink className="w-8 h-8 text-on-surface-variant mb-2" />
+                <p className="text-body-md text-on-surface font-semibold">No routes yet</p>
+                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Add paths to "My Routes" in the explorer to see them here.</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Recent Routes Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 p-6 flex flex-col transition-colors">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-lg">
+        {/* Recent Activity Section */}
+        <div className="bg-surface-container-low rounded-lg border border-outline-variant p-4 flex flex-col h-[480px] transition-colors">
+          <div className="flex items-center gap-3 mb-4 shrink-0">
+            <div className="p-2 bg-surface-container-high text-tertiary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineClock className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-gray-800 dark:text-slate-100">Recent Activity</h2>
+            <h2 className="text-headline-md text-on-surface font-semibold">Recent Activity</h2>
           </div>
           
-          <div className="flex-1">
-            {recent.length > 0 ? (
-              <ul className="space-y-3">
-                {recent.map((route) => (
-                  <li key={route.path} className="group flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800/50 border border-transparent hover:border-gray-100 dark:hover:border-slate-700 transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <HiOutlineClock className="text-gray-400 dark:text-slate-500 group-hover:text-blue-500 transition-colors" />
-                      <p className="text-sm font-medium text-gray-700 dark:text-slate-300 truncate max-w-[250px]">
-                        {route.path}
-                      </p>
-                    </div>
-                    <span className="text-xs text-gray-400 dark:text-slate-500">
-                      {new Date(route.visited_at).toLocaleDateString()}
-                    </span>
-                  </li>
-                ))}
+          <div className="flex-1 overflow-y-auto pr-1 min-h-0">
+            {recentActions.length > 0 ? (
+              <ul className="space-y-2">
+                {paginatedActions.map((log) => {
+                  let Icon = HiOutlineClock;
+                  let colorClass = "text-on-surface-variant group-hover:text-tertiary";
+                  
+                  if (log.action_type === "download") {
+                    Icon = HiOutlineDownload;
+                    colorClass = "text-primary group-hover:scale-105";
+                  } else if (log.action_type === "favorite") {
+                    Icon = HiOutlineStar;
+                    colorClass = "text-amber-400 group-hover:scale-105";
+                  } else if (log.action_type === "visit") {
+                    Icon = HiOutlineDatabase;
+                    colorClass = "text-secondary group-hover:scale-105";
+                  }
+
+                  return (
+                    <li 
+                      key={log.id} 
+                      className="group flex items-center justify-between p-2.5 rounded hover:bg-surface-container-highest/50 border border-transparent hover:border-outline-variant/30 transition-colors mb-1.5"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                        <div className={`shrink-0 transition-all ${colorClass}`}>
+                          <Icon size={18} />
+                        </div>
+                        <p className="text-body-md text-on-surface-variant truncate" title={log.details}>
+                          {log.details}
+                        </p>
+                      </div>
+                      <span className="text-label-sm text-on-surface-variant font-mono shrink-0">
+                        {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl">
-                <HiOutlineClock className="w-8 h-8 text-gray-300 dark:text-slate-700 mb-2" />
-                <p className="text-sm text-gray-500 dark:text-slate-500 font-medium">No recent activity</p>
-                <p className="text-xs text-gray-400 dark:text-slate-600 mt-1">Navigate through buckets to build your history.</p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline-variant rounded">
+                <HiOutlineClock className="w-8 h-8 text-on-surface-variant mb-2" />
+                <p className="text-body-md text-on-surface font-semibold">No recent activity</p>
+                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Navigate through buckets or save paths to build your history.</p>
               </div>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {recentActions.length > 0 && (
+            <div className="flex items-center justify-between border-t border-outline-variant/30 pt-3 mt-3 shrink-0 text-label-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-on-surface-variant">Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="bg-surface-container-high border border-outline-variant/50 rounded px-2 py-1 text-on-surface focus:outline-none focus:border-primary cursor-pointer text-label-sm font-mono"
+                >
+                  {[5, 10, 15, 20].map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-on-surface-variant font-mono">
+                  Page {activePage} of {totalPages}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={activePage === 1}
+                    className="p-1 rounded bg-surface-container-high border border-outline-variant/30 hover:border-outline-variant hover:bg-surface-container-highest disabled:opacity-40 disabled:cursor-not-allowed text-on-surface transition-colors cursor-pointer"
+                    title="Previous Page"
+                  >
+                    <HiChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={activePage === totalPages}
+                    className="p-1 rounded bg-surface-container-high border border-outline-variant/30 hover:border-outline-variant hover:bg-surface-container-highest disabled:opacity-40 disabled:cursor-not-allowed text-on-surface transition-colors cursor-pointer"
+                    title="Next Page"
+                  >
+                    <HiChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -155,21 +265,22 @@ export default function DashboardPage() {
 }
 
 // Sub-component for Stats
-function StatCard({ title, value, trend, icon, color }: { title: string, value: string, trend: string, icon: React.ReactNode, color: string }) {
+function StatCard({ title, value, trend, icon }: { title: string, value: string, trend: string, icon: React.ReactNode }) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
-      <div className="flex items-center justify-between mb-4">
-        <div className={`p-3 rounded-xl ${color}`}>
+    <div className="bg-surface-container-low rounded-lg p-4 border border-outline-variant transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className="p-2 rounded bg-surface-container-high border border-outline-variant flex items-center justify-center">
           {icon}
         </div>
-        <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
+        <span className="text-label-sm font-medium text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded-sm font-mono">
           {trend}
         </span>
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-500 dark:text-slate-400">{title}</p>
-        <p className="text-2xl font-bold text-gray-900 dark:text-slate-100 mt-1">{value}</p>
+        <p className="text-body-md text-on-surface-variant">{title}</p>
+        <p className="text-headline-md font-bold text-on-surface mt-0.5">{value}</p>
       </div>
     </div>
   );
 }
+
