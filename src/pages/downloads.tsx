@@ -47,25 +47,25 @@ const DownloadItem = ({
     const isCompleted = task.status === 'completed';
 
     return (
-        <div className="group relative bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl p-4 transition-all hover:shadow-md dark:shadow-slate-950/40 hover:border-blue-100 dark:hover:border-blue-900/50 mb-3">
+        <div className="group relative bg-surface-container-low border border-outline-variant rounded-lg p-4 transition-all hover:bg-surface-container-highest/20 mb-3">
             <div className="flex items-start gap-4">
                 {/* File Icon */}
-                <div className={`p-3 rounded-lg ${isDownloading ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : isPaused ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : isError ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-400'}`}>
-                    <HiOutlineDocumentText size={24} />
+                <div className={`p-2.5 rounded border ${isDownloading ? 'bg-surface-container text-primary border-primary/20' : isPaused ? 'bg-surface-container text-secondary border-secondary/20' : isError ? 'bg-surface-container text-error border-error/20' : 'bg-surface-container text-on-surface-variant border-outline-variant'}`}>
+                    <HiOutlineDocumentText size={20} />
                 </div>
 
                 {/* Main Content */}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate" title={task.fileName}>
+                        <h3 className="text-body-md font-bold text-on-surface truncate" title={task.fileName}>
                             {task.fileName}
                         </h3>
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+                        <span className="text-label-sm font-mono font-medium px-1.5 py-0.5 rounded-sm bg-surface-container text-on-surface-variant border border-outline-variant uppercase tracking-wider">
                             {task.bucket}
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-slate-500">
+                    <div className="flex items-center gap-3 mt-1 text-label-sm font-mono text-on-surface-variant">
                         <span className="flex items-center gap-1">
                             <HiOutlineClock size={12} />
                             {formatDate(task.startTime)}
@@ -82,17 +82,17 @@ const DownloadItem = ({
                     {/* Progress Bar */}
                     {(isDownloading || isPaused) && (
                         <div className="mt-3">
-                            <div className="flex justify-between mb-1 text-[11px] font-medium">
-                                <span className={isPaused ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}>
+                            <div className="flex justify-between mb-1 text-label-sm font-mono">
+                                <span className={isPaused ? 'text-secondary' : 'text-primary'}>
                                     {task.status === 'queued' ? 'En cola...' : isPaused ? `Pausado... ${task.progress.toFixed(1)}%` : `Descargando... ${task.progress.toFixed(1)}%`}
                                 </span>
                                 {task.status === 'downloading' && (
-                                    <span className="text-gray-400 dark:text-slate-500">{task.speed}</span>
+                                    <span className="text-on-surface-variant">{task.speed}</span>
                                 )}
                             </div>
-                            <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-1.5 overflow-hidden">
+                            <div className="w-full bg-surface-container rounded-sm h-1.5 overflow-hidden border border-outline-variant/30">
                                 <div 
-                                    className={`h-1.5 rounded-full transition-all duration-300 ${isPaused ? 'bg-amber-500' : 'bg-blue-600'}`} 
+                                    className={`h-1.5 rounded-sm transition-all duration-300 ${isPaused ? 'bg-secondary' : 'bg-primary'}`} 
                                     style={{ width: `${task.progress}%` }}
                                 ></div>
                             </div>
@@ -103,13 +103,13 @@ const DownloadItem = ({
                     <div className="mt-2 flex items-center gap-4">
                         {isCompleted && (
                             <>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-primary">
                                     <HiOutlineCheckCircle size={14} />
                                     Completado
                                 </div>
                                 <button 
                                     onClick={() => onOpenFolder(task.savePath)}
-                                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                    className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
                                     <HiOutlineFolderOpen size={14} />
                                     Mostrar en carpeta
@@ -119,13 +119,13 @@ const DownloadItem = ({
 
                         {isError && (
                             <>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-error">
                                     <HiOutlineExclamationCircle size={14} />
                                     Error: {task.error}
                                 </div>
                                 <button 
                                     onClick={() => onRetry(task)}
-                                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                    className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
                                     <HiOutlineRefresh size={14} />
                                     Reintentar
@@ -135,13 +135,13 @@ const DownloadItem = ({
 
                         {isPaused && (
                             <>
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-secondary">
                                     <HiOutlineClock size={14} />
                                     Pausado
                                 </div>
                                 <button 
                                     onClick={() => onRetry(task)}
-                                    className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                                    className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
                                     <HiOutlineRefresh size={14} />
                                     Reanudar
@@ -152,7 +152,7 @@ const DownloadItem = ({
                         {isDownloading && (
                             <button 
                                 onClick={() => onPause(task)}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                                className="flex items-center gap-1 text-label-sm font-mono font-semibold text-secondary hover:underline cursor-pointer"
                             >
                                 <HiOutlinePause size={14} />
                                 Pausar
@@ -165,7 +165,7 @@ const DownloadItem = ({
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
                         onClick={() => onDelete(task.id)}
-                        className="p-2 text-gray-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                        className="p-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
                         title="Eliminar del historial"
                     >
                         <HiOutlineX size={18} />
@@ -208,17 +208,17 @@ export default function DownloadsPage() {
     }, [tasks, searchTerm]);
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 p-4 md:p-8 font-sans text-gray-900 dark:text-slate-100 overflow-y-auto transition-colors duration-300">
+        <div className="min-h-screen bg-surface p-4 md:p-6 font-inter text-on-surface overflow-y-auto transition-colors duration-300">
             <div className="max-w-3xl mx-auto">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Historial de Descargas</h1>
-                        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Gestiona tus archivos descargados y el progreso actual.</p>
+                        <h1 className="text-headline-lg font-bold text-on-surface">Historial de Descargas</h1>
+                        <p className="text-body-md text-on-surface-variant mt-1">Gestiona tus archivos descargados y el progreso actual.</p>
                     </div>
                     <button 
                         onClick={clearHistory}
-                        className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shadow-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-2 text-body-md font-medium text-error bg-surface-container border border-error/20 rounded hover:bg-error-container/25 transition-colors cursor-pointer"
                     >
                         <HiOutlineTrash size={16} />
                         Limpiar Historial
@@ -227,13 +227,13 @@ export default function DownloadsPage() {
 
                 {/* Search Bar */}
                 <div className="relative mb-6">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <HiOutlineSearch className="h-5 w-5 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-on-surface-variant">
+                        <HiOutlineSearch className="h-5 w-5" />
                     </div>
                     <input
                         type="text"
                         placeholder="Buscar por nombre de archivo o bucket..."
-                        className="block w-full pl-10 pr-3 py-2.5 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/50 focus:border-transparent transition-all outline-none text-sm shadow-sm dark:text-slate-100"
+                        className="block w-full pl-9 pr-3 py-2.5 border border-outline-variant rounded bg-surface-container text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -253,12 +253,12 @@ export default function DownloadsPage() {
                             />
                         ))
                     ) : (
-                        <div className="text-center py-12 bg-white dark:bg-slate-900 rounded-2xl border-2 border-dashed border-gray-100 dark:border-slate-800 transition-colors">
-                            <div className="mx-auto w-12 h-12 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-400 dark:text-slate-600 mb-4">
-                                <HiOutlineDownload size={24} />
+                        <div className="text-center py-12 bg-surface-container rounded-lg border border-dashed border-outline-variant transition-colors">
+                            <div className="mx-auto w-12 h-12 bg-surface-container-high rounded flex items-center justify-center text-on-surface-variant border border-outline-variant mb-4">
+                                <HiOutlineDownload size={22} />
                             </div>
-                            <p className="text-gray-500 dark:text-slate-400 font-medium">No se encontraron archivos</p>
-                            <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Tu historial está vacío o no coincide con la búsqueda.</p>
+                            <p className="text-body-md text-on-surface font-semibold">No se encontraron archivos</p>
+                            <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Tu historial está vacío o no coincide con la búsqueda.</p>
                         </div>
                     )}
                 </div>

@@ -30,6 +30,7 @@ import {
   startS3Download,
   uploadS3File,
   getCurrentActiveProfile,
+  getAwsAccountDisplayName,
 } from "../features/aws/s3Client";
 import {
   addRoute,
@@ -462,12 +463,12 @@ export default function BucketExplorerPage() {
         );
         return (
           <div className="flex items-center gap-3">
-            <div className="group-hover:scale-110 transition-transform">
+            <div className="group-hover:scale-105 transition-transform flex items-center">
               {getIconForType(obj.type)}
             </div>
             <div className="flex flex-col min-w-0">
               <span
-                className={`font-bold truncate text-sm ${obj.type === "folder" ? "text-indigo-600 dark:text-indigo-400/90 hover:underline" : "text-gray-900 dark:text-slate-200"}`}
+                className={`font-bold truncate text-body-md ${obj.type === "folder" ? "text-primary hover:underline" : "text-on-surface"}`}
               >
                 {obj.name}
               </span>
@@ -475,18 +476,18 @@ export default function BucketExplorerPage() {
                 <div className="flex items-center gap-1.5 mt-0.5 animate-in slide-in-from-top-1">
                   {downloadTask.status === "downloading" ? (
                     <>
-                      <div className="w-16 h-1 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-16 h-1 bg-surface-container rounded-sm overflow-hidden border border-outline-variant/30">
                         <div
-                          className="h-full bg-indigo-600 transition-all duration-300"
+                          className="h-full bg-primary transition-all duration-300"
                           style={{ width: `${downloadTask.progress}%` }}
                         />
                       </div>
-                      <span className="text-[9px] text-indigo-600 font-black">
+                      <span className="text-label-sm text-primary font-mono font-medium">
                         {Math.round(downloadTask.progress)}%
                       </span>
                     </>
                   ) : (
-                    <div className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-wider">
+                    <div className="flex items-center gap-1 text-label-sm text-on-surface-variant font-mono uppercase tracking-wider">
                       <HiOutlineClock className="w-3 h-3" /> Queued
                     </div>
                   )}
@@ -502,13 +503,13 @@ export default function BucketExplorerPage() {
       header: "Type",
       sortable: true,
       className:
-        "text-gray-400 font-bold text-[10px] uppercase tracking-widest",
+        "text-on-surface-variant font-medium text-label-sm uppercase tracking-wider font-mono",
     },
     {
       key: "date",
       header: "Last Modified",
       sortable: true,
-      className: "text-gray-500 font-medium text-xs",
+      className: "text-on-surface-variant text-body-md",
       render: (obj) =>
         obj.date !== "-" ? new Date(obj.date).toLocaleString() : "-",
     },
@@ -516,14 +517,14 @@ export default function BucketExplorerPage() {
       key: "size",
       header: "Size",
       sortable: true,
-      className: "text-gray-500 font-medium text-xs",
+      className: "text-on-surface-variant text-body-md",
     },
     {
       key: "storageClass",
       header: "Storage Class",
       render: (obj) =>
         obj.storageClass !== "-" ? (
-          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 font-bold text-[9px] rounded-md uppercase border border-gray-200 tracking-wider">
+          <span className="px-1.5 py-0.5 bg-surface-container-high text-on-surface-variant font-medium text-label-sm rounded-sm uppercase border border-outline-variant tracking-wider font-mono">
             {obj.storageClass}
           </span>
         ) : (
@@ -549,7 +550,7 @@ export default function BucketExplorerPage() {
                     e.stopPropagation();
                     handleDownload(obj);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-lg border border-transparent hover:border-gray-100 transition-all"
+                  className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded border border-transparent transition-all cursor-pointer"
                   title="Download"
                 >
                   <HiOutlineDownload size={16} />
@@ -559,7 +560,7 @@ export default function BucketExplorerPage() {
                     e.stopPropagation();
                     handleShare(obj);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-lg border border-transparent hover:border-gray-100 transition-all"
+                  className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded border border-transparent transition-all cursor-pointer"
                   title="Share"
                 >
                   <HiOutlineShare size={16} />
@@ -573,11 +574,11 @@ export default function BucketExplorerPage() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-gray-50 dark:bg-slate-950 p-4 md:p-8 font-sans text-gray-900 dark:text-slate-100 overflow-hidden transition-colors duration-300">
+    <div className="flex-1 flex flex-col min-h-0 bg-surface p-4 md:p-6 font-inter text-on-surface overflow-hidden transition-colors duration-300">
       <div className="w-full mx-auto">
         <Breadcrumb
           items={[
-            { label: "Amazon S3", path: "/buckets" },
+            { label: getAwsAccountDisplayName(), path: "/buckets" },
             { label: "Buckets", path: "/buckets" },
             {
               label: bucketName || "Bucket",
@@ -597,17 +598,17 @@ export default function BucketExplorerPage() {
         />
 
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-extrabold text-gray-900 dark:text-slate-100 tracking-tight flex items-center gap-2.5">
-              <div className="p-1.5 bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400/80 rounded-lg border border-indigo-200/50 dark:border-indigo-500/20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-headline-lg font-bold text-on-surface tracking-tight flex items-center gap-2">
+              <div className="p-1.5 bg-surface-container-high text-primary border border-outline-variant rounded">
                 <HiOutlineFolder size={20} />
               </div>
               {currentPrefix.split("/").filter(Boolean).pop() || bucketName}
             </h1>
             <button
               onClick={handleToggleFavorite}
-              className={`p-1.5 rounded-xl transition-all cursor-pointer ${isFavorite ? "text-amber-400 dark:text-amber-400/90 bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20 shadow-sm hover:bg-amber-100 dark:hover:bg-amber-500/20" : "text-gray-400 dark:text-slate-500 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 hover:text-amber-500 dark:hover:text-amber-400 hover:shadow-md active:scale-95"}`}
+              className={`p-1.5 rounded transition-all cursor-pointer ${isFavorite ? "text-amber-400 bg-surface-container border border-amber-500/20" : "text-on-surface-variant bg-surface-container border border-outline-variant hover:text-amber-500 hover:bg-surface-container-high"}`}
               title={isFavorite ? "Remove from My Routes" : "Add to My Routes"}
             >
               {isFavorite ? <HiStar size={20} /> : <HiOutlineStar size={20} />}
@@ -617,7 +618,7 @@ export default function BucketExplorerPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={fetchObjects}
-              className="p-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-300 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-all shadow-sm active:scale-95"
+              className="p-2 bg-surface-container border border-outline-variant text-on-surface rounded hover:bg-surface-container-high transition-all cursor-pointer"
               title="Refresh"
             >
               <HiOutlineRefresh
@@ -627,13 +628,13 @@ export default function BucketExplorerPage() {
             </button>
             <button
               onClick={handleUpload}
-              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-body-md font-medium rounded hover:bg-primary/95 transition-all border border-transparent cursor-pointer"
             >
               Upload Files
             </button>
             <button
               onClick={handleLogout}
-              className="p-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-100 dark:hover:bg-red-500/20 transition-all border border-red-100 dark:border-red-500/20"
+              className="p-2 bg-error-container/20 text-error rounded hover:bg-error-container/30 border border-error/20 transition-all cursor-pointer"
               title="Sign out"
             >
               <HiOutlineLogout size={16} />
@@ -642,14 +643,14 @@ export default function BucketExplorerPage() {
         </div>
 
         {error && (
-          <div className="mb-6 p-5 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900/30 rounded-2xl animate-in slide-in-from-top-2">
+          <div className="mb-6 p-4 bg-error-container text-on-error-container border border-error/20 rounded text-body-md font-medium animate-in slide-in-from-top-2">
             <div className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-4">
-                <span className="font-bold text-sm leading-relaxed">{error}</span>
+                <span className="font-bold text-body-md leading-relaxed">{error}</span>
                 {!ssoNeedsLogin && (
                   <button
                     onClick={fetchObjects}
-                    className="px-4 py-2 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-300 font-bold rounded-xl transition-all active:scale-95 text-xs uppercase tracking-wider"
+                    className="px-3 py-1.5 bg-error-container/50 hover:bg-error-container/80 text-on-error-container font-mono text-label-sm rounded transition-all cursor-pointer uppercase tracking-wider"
                   >
                     Retry
                   </button>
@@ -657,12 +658,12 @@ export default function BucketExplorerPage() {
               </div>
               
               {ssoNeedsLogin && (
-                <div className="mt-2 p-4 bg-amber-50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/20 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-300">
+                <div className="mt-2 p-3 bg-surface-container border border-outline-variant rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-300">
                   <div className="flex-1">
-                    <h4 className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider font-sans">
+                    <h4 className="text-label-sm font-bold text-primary uppercase tracking-wider font-mono">
                       SSO Session Expired
                     </h4>
-                    <p className="text-[11px] text-amber-600 dark:text-amber-400/85 font-medium mt-0.5 font-sans leading-relaxed">
+                    <p className="text-label-sm text-on-surface-variant font-medium mt-0.5 font-sans leading-relaxed">
                       The active token for AWS profile '{expiredProfile}' has expired. Click below to re-authenticate in your browser.
                     </p>
                   </div>
@@ -696,7 +697,7 @@ export default function BucketExplorerPage() {
                         setIsLoading(false);
                       }
                     }}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 dark:bg-amber-500/80 hover:bg-amber-700 dark:hover:bg-amber-600 text-white font-extrabold rounded-xl transition-all shadow-md shadow-amber-100/20 active:scale-95 text-xs whitespace-nowrap"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/95 text-on-primary font-medium rounded transition-all text-body-md whitespace-nowrap cursor-pointer"
                   >
                     Log in to AWS SSO
                   </button>
@@ -706,24 +707,24 @@ export default function BucketExplorerPage() {
           </div>
         )}
 
-        <div className="flex-1 min-h-0 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl shadow-xl shadow-gray-200/50 dark:shadow-slate-950/40 overflow-hidden flex flex-col">
-          <div className="px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-50 dark:border-slate-800 flex items-center justify-between gap-4 flex-wrap">
+        <div className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4 flex-1 min-w-[300px]">
               <div className="relative w-full max-w-md">
                 <HiOutlineSearch
-                  className="absolute left-3.5 top-2.5 text-gray-400 dark:text-slate-500"
-                  size={18}
+                  className="absolute left-3 top-3 text-on-surface-variant"
+                  size={16}
                 />
                 <input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Filter objects by name..."
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50/50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all outline-none font-medium text-xs text-gray-900 dark:text-slate-100"
+                  className="w-full pl-9 pr-4 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
                 />
               </div>
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
-                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-500/20 uppercase">
+                  <span className="text-label-sm font-medium text-primary bg-surface-container-high px-2 py-0.5 rounded-sm border border-outline-variant uppercase">
                     {selectedIds.size} selected
                   </span>
                   <button
@@ -734,14 +735,14 @@ export default function BucketExplorerPage() {
                       });
                       setSelectedIds(new Set());
                     }}
-                    className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors uppercase tracking-wider"
+                    className="flex items-center gap-1.5 text-primary text-label-sm font-medium bg-surface-container-high px-3 py-1 rounded border border-outline-variant hover:bg-surface-container-highest transition-colors uppercase tracking-wider font-mono cursor-pointer"
                   >
                     <HiOutlineDownload size={14} /> Download
                   </button>
                 </div>
               )}
             </div>
-            <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest">
+            <div className="text-label-sm font-medium text-on-surface-variant font-mono uppercase tracking-wider">
               {currentFiles.length} items
             </div>
           </div>

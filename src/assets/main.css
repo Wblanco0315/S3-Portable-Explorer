@@ -1,3 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
 @variant dark (.dark &);
+
+@theme {
+  --font-geist: "Geist", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Dynamic colors from rules.md */
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-surface-tint: var(--surface-tint);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-inverse-primary: var(--inverse-primary);
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+  --color-primary-fixed: var(--primary-fixed);
+  --color-primary-fixed-dim: var(--primary-fixed-dim);
+  --color-on-primary-fixed: var(--on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--on-primary-fixed-variant);
+  --color-secondary-fixed: var(--secondary-fixed);
+  --color-secondary-fixed-dim: var(--secondary-fixed-dim);
+  --color-on-secondary-fixed: var(--on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--on-secondary-fixed-variant);
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
+  --color-on-tertiary-fixed: var(--on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
+  --color-background-custom: var(--background-custom);
+  --color-on-background: var(--on-background);
+  --color-surface-variant: var(--surface-variant);
+
+  /* Spacing */
+  --spacing-unit: 4px;
+  --spacing-gutter: 16px;
+  --spacing-margin: 24px;
+  --spacing-container-padding: 12px;
+}
+
+:root {
+  /* Matte Precision Light Colors */
+  --surface: #f8f9ff;
+  --surface-dim: #d4dae5;
+  --surface-bright: #f8f9ff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #eef4ff;
+  --surface-container: #e8eef9;
+  --surface-container-high: #e2e8f4;
+  --surface-container-highest: #dde3ee;
+  --on-surface: #161c24;
+  --on-surface-variant: #43474e;
+  --inverse-surface: #2b3139;
+  --inverse-on-surface: #ebf1fc;
+  --outline: #73777f;
+  --outline-variant: #c3c6cf;
+  --surface-tint: #416086;
+  --primary: #335377;
+  --on-primary: #ffffff;
+  --primary-container: #4c6b91;
+  --on-primary-container: #deeaff;
+  --inverse-primary: #a9c9f4;
+  --secondary: #575e6f;
+  --on-secondary: #ffffff;
+  --secondary-container: #dce2f7;
+  --on-secondary-container: #5d6475;
+  --tertiary: #6a4b11;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #856328;
+  --on-tertiary-container: #ffe6c3;
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+  --primary-fixed: #d2e4ff;
+  --primary-fixed-dim: #a9c9f4;
+  --on-primary-fixed: #001c37;
+  --on-primary-fixed-variant: #28486c;
+  --secondary-fixed: #dce2f7;
+  --secondary-fixed-dim: #c0c6da;
+  --on-secondary-fixed: #141c2a;
+  --on-secondary-fixed-variant: #404757;
+  --tertiary-fixed: #ffdead;
+  --tertiary-fixed-dim: #ebc07b;
+  --on-tertiary-fixed: #281900;
+  --on-tertiary-fixed-variant: #5f4107;
+  --background-custom: #f8f9ff;
+  --on-background: #161c24;
+  --surface-variant: #dde3ee;
+}
+
+.dark {
+  /* Matte Precision Dark Colors */
+  --surface: #0d131e;
+  --surface-dim: #0d131e;
+  --surface-bright: #333945;
+  --surface-container-lowest: #080e19;
+  --surface-container-low: #161c27;
+  --surface-container: #1a202b;
+  --surface-container-high: #242a36;
+  --surface-container-highest: #2f3541;
+  --on-surface: #dde2f2;
+  --on-surface-variant: #c3c6cf;
+  --inverse-surface: #dde2f2;
+  --inverse-on-surface: #2b313c;
+  --outline: #8d9199;
+  --outline-variant: #43474e;
+  --surface-tint: #a6c9f8;
+  --primary: #a6c9f8;
+  --on-primary: #033258;
+  --primary-container: #7093bf;
+  --on-primary-container: #002b4e;
+  --inverse-primary: #3d608a;
+  --secondary: #bcc7de;
+  --on-secondary: #273143;
+  --secondary-container: #3f495d;
+  --on-secondary-container: #aeb8d0;
+  --tertiary: #97cfe0;
+  --on-tertiary: #003640;
+  --tertiary-container: #6199a8;
+  --on-tertiary-container: #002e38;
+  --error: #ffb4ab;
+  --on-error: #690005;
+  --error-container: #93000a;
+  --on-error-container: #ffdad6;
+  --primary-fixed: #d2e4ff;
+  --primary-fixed-dim: #a6c9f8;
+  --on-primary-fixed: #001c37;
+  --on-primary-fixed-variant: #234970;
+  --secondary-fixed: #d8e3fb;
+  --secondary-fixed-dim: #bcc7de;
+  --on-secondary-fixed: #111c2d;
+  --on-secondary-fixed-variant: #3d475a;
+  --tertiary-fixed: #b3ecfc;
+  --tertiary-fixed-dim: #97cfe0;
+  --on-tertiary-fixed: #001f26;
+  --on-tertiary-fixed-variant: #094e5c;
+  --background-custom: #0d131e;
+  --on-background: #dde2f2;
+  --surface-variant: #2f3541;
+}
+
+/* Custom styles mapping classes to rules.md typography and elements */
+@layer base {
+  body {
+    font-family: "Inter", sans-serif;
+    background-color: var(--color-surface);
+    color: var(--color-on-surface);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Geist", sans-serif;
+  }
+}
+
+.text-headline-lg {
+  font-family: "Geist", sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.text-headline-md {
+  font-family: "Geist", sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.text-body-lg {
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.text-body-md {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.text-label-md {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+}
+
+.text-label-sm {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+}

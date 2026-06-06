@@ -102,6 +102,8 @@ window.fetch = async (input, init) => {
           yield [k, v];
         }
       }
+      // Always add an empty Origin header to signal tauri-plugin-http to omit/remove the Origin header.
+      yield ['origin', ''];
     };
 
     customHeadersAny[Symbol.iterator] = customHeadersAny.entries;
@@ -113,6 +115,8 @@ window.fetch = async (input, init) => {
           callbackfn.call(thisArg, value, key, parent);
         }
       });
+      // Always call back with an empty Origin header to signal omission
+      callbackfn.call(thisArg, '', 'origin', customHeaders);
     };
 
     newInit.headers = customHeaders;
@@ -133,7 +137,13 @@ window.fetch = async (input, init) => {
   return (window as any).__originalFetch(input, init);
 };
 
-export const setAwsCredentials = (accessKeyId: string, secretAccessKey: string, sessionToken?: string, region: string = "us-east-1") => {
+export const setAwsCredentials = (
+  accessKeyId: string,
+  secretAccessKey: string,
+  sessionToken?: string,
+  region: string = "us-east-1",
+  expiration?: number
+) => {
   s3ClientInstance = new S3Client({
     region,
     credentials: {
@@ -142,6 +152,11 @@ export const setAwsCredentials = (accessKeyId: string, secretAccessKey: string, 
       ...(sessionToken && { sessionToken })
     }
   });
+  if (expiration) {
+    localStorage.setItem("aws_credentials_expires_at", expiration.toString());
+  } else {
+    localStorage.removeItem("aws_credentials_expires_at");
+  }
   // IMPORTANT: Clear the regional client cache whenever credentials change!
   // Otherwise, we might use a cached client with old credentials.
   Object.keys(regionClients).forEach(key => delete regionClients[key]);
@@ -149,6 +164,7 @@ export const setAwsCredentials = (accessKeyId: string, secretAccessKey: string, 
 
 export const clearAwsCredentials = () => {
   s3ClientInstance = null;
+  localStorage.removeItem("aws_credentials_expires_at");
   // Clear regional client cache too
   Object.keys(regionClients).forEach(key => delete regionClients[key]);
 };
@@ -161,7 +177,76 @@ export const getCurrentActiveProfile = () => {
   return localStorage.getItem("aws_sso_profile");
 };
 
+export const getAwsAccountDisplayName = () => {
+  const authMethod = localStorage.getItem("aws_auth_method");
+  if (authMethod === "sso-native") {
+    const accName = localStorage.getItem("aws_sso_account_name");
+    if (accName) {
+      return `Amazon S3 (${accName})`;
+    }
+    const accId = localStorage.getItem("aws_sso_account_id");
+    if (accId) {
+      return `Amazon S3 (${accId})`;
+    }
+  } else {
+    const profile = localStorage.getItem("aws_sso_profile");
+    if (profile) {
+      return `Amazon S3 (${profile})`;
+    }
+  }
+  return "Amazon S3";
+};
+
+export const refreshCredentialsIfNeeded = async () => {
+  const authMethod = localStorage.getItem("aws_auth_method");
+  if (authMethod !== "sso-native") return;
+
+  const expiresAtStr = localStorage.getItem("aws_credentials_expires_at");
+  if (!expiresAtStr) return;
+
+  const expiresAt = parseInt(expiresAtStr, 10);
+  // If credentials expire in less than 5 minutes (300,000 ms), refresh them!
+  if (isNaN(expiresAt) || expiresAt - Date.now() > 300000) {
+    return;
+  }
+
+  console.log("[S3Client] Credentials expiring soon or expired. Refreshing in background...");
+  const token = localStorage.getItem("aws_sso_token");
+  const tokenExpiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
+  const accountId = localStorage.getItem("aws_sso_account_id");
+  const roleName = localStorage.getItem("aws_sso_role_name");
+  const ssoRegion = localStorage.getItem("aws_region") || "us-east-1";
+
+  if (!token || !tokenExpiresAtStr || !accountId || !roleName) {
+    console.warn("[S3Client] Missing native SSO details to refresh credentials.");
+    return;
+  }
+
+  const tokenExpiresAt = parseInt(tokenExpiresAtStr, 10);
+  if (isNaN(tokenExpiresAt) || tokenExpiresAt < Date.now()) {
+    console.warn("[S3Client] Cannot refresh credentials, SSO token is expired.");
+    return;
+  }
+
+  try {
+    const { getRoleCredentials } = await import("./awsSsoOidc");
+    const creds = await getRoleCredentials(token, accountId, roleName, ssoRegion);
+
+    setAwsCredentials(
+      creds.accessKeyId,
+      creds.secretAccessKey,
+      creds.sessionToken,
+      ssoRegion,
+      creds.expiration
+    );
+    console.log("[S3Client] Credentials refreshed successfully.");
+  } catch (err) {
+    console.error("[S3Client] Failed to refresh credentials in background:", err);
+  }
+};
+
 export const getBuckets = async () => {
+  await refreshCredentialsIfNeeded();
   if (!s3ClientInstance) throw new Error("AWS Credentials not set");
   const command = new ListBucketsCommand({});
   const response = await s3ClientInstance.send(command);
@@ -171,6 +256,7 @@ export const getBuckets = async () => {
 const regionClients: Record<string, S3Client> = {};
 
 const getClientForBucket = async (bucketName: string): Promise<S3Client> => {
+  await refreshCredentialsIfNeeded();
   if (!s3ClientInstance) throw new Error("AWS Credentials not set");
 
   // To avoid fetching location repeatedly, we can cache the region.

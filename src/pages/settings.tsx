@@ -56,56 +56,56 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50 mb-2">Settings</h1>
+    <div className="p-6 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 bg-surface text-on-surface">
+      <h1 className="text-headline-lg font-bold text-on-surface">Settings</h1>
       
       {/* Preferences Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800/80 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-slate-800/60">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">Preferences</h2>
-          <p className="text-sm text-gray-500 dark:text-slate-400">Manage your general application settings.</p>
+      <div className="bg-surface-container-low rounded-lg border border-outline-variant overflow-hidden">
+        <div className="px-6 py-4 bg-surface-container border-b border-outline-variant">
+          <h2 className="text-headline-md font-semibold text-on-surface">Preferences</h2>
+          <p className="text-body-md text-on-surface-variant">Manage your general application settings.</p>
         </div>
         
         <div className="p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+            <label className="block text-body-md font-medium text-on-surface mb-2">
               Default Download Directory
             </label>
             <div className="flex items-center gap-3">
-              <div className="flex-1 bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-lg px-4 py-2.5 text-sm text-gray-600 dark:text-slate-300 truncate">
+              <div className="flex-1 bg-surface-container-lowest border border-outline-variant rounded px-4 py-2 text-body-md text-on-surface truncate">
                 {downloadDir || "No directory selected"}
               </div>
               <button
                 onClick={handleSelectFolder}
-                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 font-medium text-sm rounded-lg transition-colors border border-indigo-100 dark:border-indigo-500/25 cursor-pointer"
+                className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high font-medium text-body-md rounded transition-colors cursor-pointer"
               >
-                <HiOutlineFolderOpen className="w-5 h-5" />
+                <HiOutlineFolderOpen className="w-4 h-4" />
                 Change Folder
               </button>
             </div>
             {isSavingDir && (
-              <p className="mt-2 text-sm text-green-600 dark:text-emerald-450 font-medium">Saved successfully!</p>
+              <p className="mt-2 text-body-md text-tertiary font-medium">Saved successfully!</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Corporate AWS SSO Configuration Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800/80 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-slate-800/60 flex items-center gap-2">
-          <div className="text-indigo-600 dark:text-indigo-400">
+      <div className="bg-surface-container-low rounded-lg border border-outline-variant overflow-hidden">
+        <div className="px-6 py-4 bg-surface-container border-b border-outline-variant flex items-center gap-2">
+          <div className="text-primary">
             <HiOutlineShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">AWS SSO Corporativo (Nativo)</h2>
-            <p className="text-sm text-gray-500 dark:text-slate-400">Configura la URL de inicio del SSO de tu empresa para la autenticación sin AWS CLI.</p>
+            <h2 className="text-headline-md font-semibold text-on-surface">AWS SSO Corporativo (Nativo)</h2>
+            <p className="text-body-md text-on-surface-variant">Configura la URL de inicio del SSO de tu empresa para la autenticación sin AWS CLI.</p>
           </div>
         </div>
 
         <form onSubmit={handleSaveSsoSettings} className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+              <label className="block text-body-md font-medium text-on-surface mb-2">
                 SSO Start URL
               </label>
               <input
@@ -113,13 +113,13 @@ export default function SettingsPage() {
                 value={ssoStartUrl}
                 onChange={(e) => setSsoStartUrl(e.target.value)}
                 placeholder="https://d-xxxxxxxxx.awsapps.com/start"
-                className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-lg px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant rounded px-4 py-2 text-body-md text-on-surface focus:border-primary outline-none transition-all"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
+              <label className="block text-body-md font-medium text-on-surface mb-2">
                 SSO Region
               </label>
               <input
@@ -127,59 +127,59 @@ export default function SettingsPage() {
                 value={ssoRegion}
                 onChange={(e) => setSsoRegion(e.target.value)}
                 placeholder="us-east-1"
-                className="w-full bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-lg px-4 py-2.5 text-sm text-gray-700 dark:text-slate-200 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-500 outline-none transition-all"
+                className="w-full bg-surface-container-lowest border border-outline-variant rounded px-4 py-2 text-body-md text-on-surface focus:border-primary outline-none transition-all"
                 required
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-slate-800/60">
-            <p className="text-xs text-gray-500 dark:text-slate-400">
+          <div className="flex items-center justify-between pt-4 border-t border-outline-variant">
+            <p className="text-label-sm text-on-surface-variant font-mono">
               * Estos parámetros se guardan de forma segura en la base de datos local y automatizan el login OIDC.
             </p>
             <button
               type="submit"
               disabled={isSavingSso}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold text-sm rounded-lg shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium text-body-md rounded hover:bg-primary/95 transition-all disabled:opacity-50 cursor-pointer"
             >
-              <HiOutlineSave className="w-5 h-5" />
+              <HiOutlineSave className="w-4 h-4" />
               {isSavingSso ? "Guardando..." : "Guardar Configuración SSO"}
             </button>
           </div>
           {isSavingSso && (
-            <p className="text-sm text-green-600 dark:text-emerald-450 font-medium animate-pulse">¡Configuración SSO guardada exitosamente!</p>
+            <p className="text-body-md text-tertiary font-medium">¡Configuración SSO guardada exitosamente!</p>
           )}
         </form>
       </div>
 
       {/* System Update Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800/80 overflow-hidden">
-        <div className="p-6 border-b border-gray-100 dark:border-slate-800/60 flex items-center gap-2">
-          <div className="text-indigo-600 dark:text-indigo-400">
-            <HiOutlineRefresh className="w-6 h-6 animate-pulse" />
+      <div className="bg-surface-container-low rounded-lg border border-outline-variant overflow-hidden">
+        <div className="px-6 py-4 bg-surface-container border-b border-outline-variant flex items-center gap-2">
+          <div className="text-primary">
+            <HiOutlineRefresh className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-100">Updates</h2>
-            <p className="text-sm text-gray-500 dark:text-slate-400">Check for system updates and install the latest features.</p>
+            <h2 className="text-headline-md font-semibold text-on-surface">Updates</h2>
+            <p className="text-body-md text-on-surface-variant">Check for system updates and install the latest features.</p>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-700 dark:text-slate-300">
-                Current Version: <span className="font-semibold text-gray-900 dark:text-slate-50">v{pkg.version}</span>
+              <p className="text-body-md font-medium text-on-surface">
+                Current Version: <span className="font-semibold text-on-surface">v{pkg.version}</span>
               </p>
-              <p className="text-xs text-gray-500 dark:text-slate-450">
+              <p className="text-label-sm text-on-surface-variant font-mono">
                 Updates are cryptographically verified to ensure security.
               </p>
             </div>
             <button
               onClick={handleCheckForUpdates}
               disabled={isCheckingForUpdates}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white font-semibold text-sm rounded-lg shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium text-body-md rounded hover:bg-primary/95 transition-all disabled:opacity-50 cursor-pointer"
             >
-              <HiOutlineRefresh className={`w-5 h-5 ${isCheckingForUpdates ? 'animate-spin' : ''}`} />
+              <HiOutlineRefresh className={`w-4 h-4 ${isCheckingForUpdates ? 'animate-spin' : ''}`} />
               {isCheckingForUpdates ? "Checking..." : "Check for Updates"}
             </button>
           </div>
