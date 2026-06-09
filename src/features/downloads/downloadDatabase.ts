@@ -1,5 +1,6 @@
 import Database from "@tauri-apps/plugin-sql";
 import { DownloadTask } from "./downloadStore";
+import { clearDownloadStats } from "../statistics/statisticsDatabase";
 
 let db: Database | null = null;
 
@@ -85,6 +86,8 @@ export const deleteDownloadTask = async (id: string) => {
 
 export const clearDownloadHistory = async () => {
     const database = await getDownloadDb();
+    // Clear the daily stats for downloads
+    await clearDownloadStats();
     // Borrar bloques de las descargas que serán eliminadas del historial
     await database.execute(`
         DELETE FROM download_chunks 

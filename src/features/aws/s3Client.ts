@@ -7,6 +7,7 @@ import { writeFile, exists } from "@tauri-apps/plugin-fs";
 import { useDownloadStore } from "../downloads/downloadStore";
 import { getDownloadChunks, saveDownloadChunks, updateDownloadChunkStatus, deleteDownloadChunks } from "../downloads/downloadDatabase";
 import { getDb } from "../../shared/hooks/useDatabase";
+import { recordDownloadCompleted } from "../statistics/statisticsDatabase";
 
 // We will store the client instance in memory after login
 let s3ClientInstance: S3Client | null = null;
@@ -539,6 +540,9 @@ export const executeDownloadTask = async (taskId: string) => {
 
     // Borrar metadatos de fragmentos de la base de datos ya que se completó el archivo
     await deleteDownloadChunks(taskId);
+
+    // Record statistics
+    await recordDownloadCompleted(downloadedSize);
 
     store.updateTask(taskId, {
       status: 'completed',

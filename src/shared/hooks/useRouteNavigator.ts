@@ -20,6 +20,7 @@ export function useRouteNavigator() {
     const targetPath = `/buckets/${route.bucket}?prefix=${encodeURIComponent(route.prefix)}`;
     const currentProfile = getCurrentActiveProfile();
     const targetProfile = route.profile || "default";
+    const isTargetNativeSSO = targetProfile.startsWith("sso-native-");
 
     if (currentProfile && currentProfile !== targetProfile) {
       console.log(`Profile mismatch: current active is '${currentProfile}', target is '${targetProfile}'. Resetting session...`);
@@ -31,29 +32,64 @@ export function useRouteNavigator() {
 
       // 2. Set the target profile variables
       localStorage.setItem("aws_sso_profile", targetProfile);
-      localStorage.setItem("aws_auth_method", "sso");
+      localStorage.setItem("aws_auth_method", isTargetNativeSSO ? "sso-native" : "sso");
 
       // 3. Save target route to session storage to navigate to after authentication
       sessionStorage.setItem("redirect_after_login", targetPath);
 
       // 4. Try automatic login for the target profile
-      try {
-        console.log(`Attempting automatic login for target profile: '${targetProfile}'`);
-        const creds = await getLocalSSOCredentials(targetProfile);
-        setAwsCredentials(
-          creds.accessKeyId,
-          creds.secretAccessKey,
-          creds.sessionToken,
-          localStorage.getItem("aws_region") || "us-east-1"
-        );
-        // Clean pending redirection since we authenticated automatically
-        sessionStorage.removeItem("redirect_after_login");
-        console.log("Automatic login successful. Redirecting directly to bucket.");
-        navigate(targetPath);
-      } catch (err) {
-        console.warn(`Automatic login failed for '${targetProfile}' (token probably expired/invalid). Directing to login screen.`, err);
-        // Redirect to /buckets which will trigger manual login flow and pre-select targetProfile
-        navigate("/buckets");
+      if (isTargetNativeSSO) {
+        try {
+          const storedToken = localStorage.getItem("aws_sso_token");
+          const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
+          const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
+          const storedAccountId = localStorage.getItem("aws_sso_account_id");
+          const storedRoleName = localStorage.getItem("aws_sso_role_name");
+          const targetAccountId = targetProfile.replace("sso-native-", "");
+          const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
+
+          if (hasToken && storedAccountId === targetAccountId && storedRoleName) {
+            console.log(`Attempting automatic native SSO login for account: ${targetAccountId}`);
+            const { getRoleCredentials } = await import("../../features/aws/awsSsoOidc");
+            const creds = await getRoleCredentials(
+              storedToken,
+              targetAccountId,
+              storedRoleName,
+              targetRegion
+            );
+            setAwsCredentials(
+              creds.accessKeyId,
+              creds.secretAccessKey,
+              creds.sessionToken,
+              targetRegion
+            );
+            sessionStorage.removeItem("redirect_after_login");
+            console.log("Automatic native SSO login successful. Redirecting directly to bucket.");
+            navigate(targetPath);
+          } else {
+            throw new Error("Missing or expired native SSO credentials/token");
+          }
+        } catch (err) {
+          console.warn(`Automatic native SSO login failed for '${targetProfile}'. Directing to login screen.`, err);
+          navigate("/buckets");
+        }
+      } else {
+        try {
+          console.log(`Attempting automatic login for target profile: '${targetProfile}'`);
+          const creds = await getLocalSSOCredentials(targetProfile);
+          setAwsCredentials(
+            creds.accessKeyId,
+            creds.secretAccessKey,
+            creds.sessionToken,
+            localStorage.getItem("aws_region") || "us-east-1"
+          );
+          sessionStorage.removeItem("redirect_after_login");
+          console.log("Automatic login successful. Redirecting directly to bucket.");
+          navigate(targetPath);
+        } catch (err) {
+          console.warn(`Automatic login failed for '${targetProfile}' (token probably expired/invalid). Directing to login screen.`, err);
+          navigate("/buckets");
+        }
       }
       return;
     }
@@ -61,25 +97,61 @@ export function useRouteNavigator() {
     // Same profile, but not authenticated
     if (!isAwsAuthenticated()) {
       localStorage.setItem("aws_sso_profile", targetProfile);
-      localStorage.setItem("aws_auth_method", "sso");
+      localStorage.setItem("aws_auth_method", isTargetNativeSSO ? "sso-native" : "sso");
       sessionStorage.setItem("redirect_after_login", targetPath);
 
-      // Try automatic login
-      try {
-        console.log(`Attempting automatic login for profile: '${targetProfile}'`);
-        const creds = await getLocalSSOCredentials(targetProfile);
-        setAwsCredentials(
-          creds.accessKeyId,
-          creds.secretAccessKey,
-          creds.sessionToken,
-          localStorage.getItem("aws_region") || "us-east-1"
-        );
-        sessionStorage.removeItem("redirect_after_login");
-        console.log("Automatic login successful. Redirecting directly to bucket.");
-        navigate(targetPath);
-      } catch (err) {
-        console.warn(`Automatic login failed for '${targetProfile}'. Navigating to login screen.`);
-        navigate("/buckets");
+      if (isTargetNativeSSO) {
+        try {
+          const storedToken = localStorage.getItem("aws_sso_token");
+          const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
+          const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
+          const storedAccountId = localStorage.getItem("aws_sso_account_id");
+          const storedRoleName = localStorage.getItem("aws_sso_role_name");
+          const targetAccountId = targetProfile.replace("sso-native-", "");
+          const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
+
+          if (hasToken && storedAccountId === targetAccountId && storedRoleName) {
+            console.log(`Attempting automatic native SSO login for account: ${targetAccountId}`);
+            const { getRoleCredentials } = await import("../../features/aws/awsSsoOidc");
+            const creds = await getRoleCredentials(
+              storedToken,
+              targetAccountId,
+              storedRoleName,
+              targetRegion
+            );
+            setAwsCredentials(
+              creds.accessKeyId,
+              creds.secretAccessKey,
+              creds.sessionToken,
+              targetRegion
+            );
+            sessionStorage.removeItem("redirect_after_login");
+            console.log("Automatic native SSO login successful. Redirecting directly to bucket.");
+            navigate(targetPath);
+          } else {
+            throw new Error("Missing or expired native SSO credentials/token");
+          }
+        } catch (err) {
+          console.warn(`Automatic native SSO login failed for '${targetProfile}'. Directing to login screen.`, err);
+          navigate("/buckets");
+        }
+      } else {
+        try {
+          console.log(`Attempting automatic login for profile: '${targetProfile}'`);
+          const creds = await getLocalSSOCredentials(targetProfile);
+          setAwsCredentials(
+            creds.accessKeyId,
+            creds.secretAccessKey,
+            creds.sessionToken,
+            localStorage.getItem("aws_region") || "us-east-1"
+          );
+          sessionStorage.removeItem("redirect_after_login");
+          console.log("Automatic login successful. Redirecting directly to bucket.");
+          navigate(targetPath);
+        } catch (err) {
+          console.warn(`Automatic login failed for '${targetProfile}'. Navigating to login screen.`, err);
+          navigate("/buckets");
+        }
       }
       return;
     }

@@ -190,6 +190,12 @@ export default function BucketPage() {
           setBuckets(bucketList);
           setIsAuthenticated(true);
           setIsLoading(false);
+
+          const pendingRedirect = sessionStorage.getItem("redirect_after_login");
+          if (pendingRedirect) {
+            sessionStorage.removeItem("redirect_after_login");
+            navigate(pendingRedirect);
+          }
           return true;
         } catch (credErr: any) {
           console.warn("Could not auto-login to saved role. Falling back to account list.", credErr);

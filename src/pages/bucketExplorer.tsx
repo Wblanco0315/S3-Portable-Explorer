@@ -42,6 +42,7 @@ import {
 import { getLocalSSOCredentials } from "../features/aws/awsCli";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { useDatabase } from "../shared/hooks/useDatabase";
+import { recordBucketVisit, recordRouteVisit } from "../features/statistics/statisticsDatabase";
 
 // Atomic Components
 import { FavoriteModal } from "../features/explorer/components/FavoriteModal";
@@ -270,21 +271,54 @@ export default function BucketExplorerPage() {
       // Check if we need to swap profiles based on the favorite route
       try {
         const routes = await listRoutes();
-        const currentRoute = routes.find(
+        const sortedRoutes = [...routes].sort((a, b) => b.prefix.length - a.prefix.length);
+        const currentRoute = sortedRoutes.find(
           (r) => r.bucket === bucketName && (currentPrefix.startsWith(r.prefix) || r.prefix === ""),
         );
 
         if (currentRoute && currentRoute.profile !== getCurrentActiveProfile()) {
           console.log(`Swapping profile to: ${currentRoute.profile}`);
           setIsLoading(true);
-          const creds = await getLocalSSOCredentials(currentRoute.profile);
-          setAwsCredentials(
-            creds.accessKeyId,
-            creds.secretAccessKey,
-            creds.sessionToken,
-            localStorage.getItem("aws_region") || "us-east-1",
-          );
-          localStorage.setItem("aws_sso_profile", currentRoute.profile);
+          
+          if (currentRoute.profile.startsWith("sso-native-")) {
+            const targetAccountId = currentRoute.profile.replace("sso-native-", "");
+            const storedToken = localStorage.getItem("aws_sso_token");
+            const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
+            const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
+            const storedAccountId = localStorage.getItem("aws_sso_account_id");
+            const storedRoleName = localStorage.getItem("aws_sso_role_name");
+            const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
+
+            if (hasToken && storedAccountId === targetAccountId && storedRoleName) {
+              const { getRoleCredentials } = await import("../features/aws/awsSsoOidc");
+              const creds = await getRoleCredentials(
+                storedToken,
+                targetAccountId,
+                storedRoleName,
+                targetRegion
+              );
+              setAwsCredentials(
+                creds.accessKeyId,
+                creds.secretAccessKey,
+                creds.sessionToken,
+                targetRegion
+              );
+              localStorage.setItem("aws_sso_profile", currentRoute.profile);
+              localStorage.setItem("aws_auth_method", "sso-native");
+            } else {
+              throw new Error("Cannot auto-swap profile: native SSO credentials or token missing/expired");
+            }
+          } else {
+            const creds = await getLocalSSOCredentials(currentRoute.profile);
+            setAwsCredentials(
+              creds.accessKeyId,
+              creds.secretAccessKey,
+              creds.sessionToken,
+              localStorage.getItem("aws_region") || "us-east-1",
+            );
+            localStorage.setItem("aws_sso_profile", currentRoute.profile);
+            localStorage.setItem("aws_auth_method", "sso");
+          }
         }
       } catch (err: any) {
         console.error("Auto-profile swap failed", err);
@@ -297,7 +331,8 @@ export default function BucketExplorerPage() {
         ) {
           setSsoNeedsLogin(true);
           const routes = await listRoutes();
-          const currentRoute = routes.find(
+          const sortedRoutes = [...routes].sort((a, b) => b.prefix.length - a.prefix.length);
+          const currentRoute = sortedRoutes.find(
             (r) => r.bucket === bucketName && (currentPrefix.startsWith(r.prefix) || r.prefix === ""),
           );
           setExpiredProfile(currentRoute?.profile || getCurrentActiveProfile() || "default");
@@ -312,6 +347,12 @@ export default function BucketExplorerPage() {
       
       // Log visit action
       logAction("visit", `Visited s3://${bucketName}/${currentPrefix}`);
+
+      // Record stats
+      if (bucketName) {
+        recordBucketVisit(bucketName).catch(err => console.error("Failed to record bucket visit stats:", err));
+        recordRouteVisit(bucketName, currentPrefix).catch(err => console.error("Failed to record route visit stats:", err));
+      }
     };
 
     initExplorer();
