@@ -1,5 +1,6 @@
 import React from 'react';
 import { FavoriteFolder } from '../../favorites/favoritesStore';
+import { useTranslation } from 'react-i18next';
 
 interface FavoriteModalProps {
     isOpen: boolean;
@@ -24,31 +25,33 @@ export const FavoriteModal: React.FC<FavoriteModalProps> = ({
     onFolderChange,
     isSaving 
 }) => {
+    const { t } = useTranslation();
+
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
             <div className="bg-surface-container border border-outline-variant rounded-lg shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-surface-variant px-margin py-3 border-b border-outline-variant">
-                    <h3 className="font-headline-md text-headline-md text-on-surface">Save to My Routes</h3>
+                    <h3 className="font-headline-md text-headline-md text-on-surface">{t("buckets.favorite_modal.title")}</h3>
                 </div>
                 
                 <div className="p-margin space-y-gutter">
                     <p className="text-body-md text-on-surface-variant">
-                        Give this path a custom name to find it easily later.
+                        {t("buckets.favorite_modal.desc")}
                     </p>
                     
                     <div className="space-y-4">
                         <div className="flex flex-col gap-2">
                             <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
-                                Name
+                                {t("buckets.favorite_modal.name_label")}
                             </label>
                             <input 
                                 autoFocus
                                 type="text" 
                                 value={name}
                                 onChange={e => onNameChange(e.target.value)}
-                                placeholder="e.g. Production Logs"
+                                placeholder={t("buckets.favorite_modal.name_placeholder")}
                                 className="w-full bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors"
                                 onKeyDown={e => e.key === 'Enter' && !(!name.trim() || isSaving) && onSave()}
                             />
@@ -56,14 +59,14 @@ export const FavoriteModal: React.FC<FavoriteModalProps> = ({
                         
                         <div className="flex flex-col gap-2">
                             <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
-                                Folder (Optional)
+                                {t("buckets.favorite_modal.folder_label")}
                             </label>
                             <select 
                                 value={selectedFolderId || ''}
                                 onChange={e => onFolderChange(e.target.value ? Number(e.target.value) : null)}
                                 className="w-full bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors cursor-pointer"
                             >
-                                <option value="" className="bg-surface text-on-surface">No folder (Root)</option>
+                                <option value="" className="bg-surface text-on-surface">{t("buckets.favorite_modal.root_folder")}</option>
                                 {(() => {
                                     const result: (FavoriteFolder & { depth: number })[] = [];
                                     const map = new Map<number | null, FavoriteFolder[]>();
@@ -99,14 +102,14 @@ export const FavoriteModal: React.FC<FavoriteModalProps> = ({
                                 onClick={onClose}
                                 className="px-4 py-2 rounded font-label-md text-label-md border border-outline-variant bg-surface hover:bg-surface-bright text-on-surface transition-colors cursor-pointer"
                             >
-                                Cancel
+                                {t("buckets.favorite_modal.cancel_btn")}
                             </button>
                             <button 
                                 onClick={onSave}
                                 disabled={isSaving || !name.trim()}
                                 className="px-4 py-2 rounded font-label-md text-label-md bg-primary hover:bg-primary-container text-on-primary font-bold disabled:opacity-50 transition-colors cursor-pointer border border-transparent"
                             >
-                                {isSaving ? "Saving..." : "Save Route"}
+                                {isSaving ? t("buckets.favorite_modal.saving_btn") : t("buckets.favorite_modal.save_btn")}
                             </button>
                         </div>
                     </div>

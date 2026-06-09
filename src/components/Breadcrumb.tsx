@@ -29,11 +29,35 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
 }) => {
     const navigate = useNavigate();
 
+    const handleBackClick = () => {
+        if (onBackClick) {
+            onBackClick();
+            return;
+        }
+
+        if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
+            navigate(-1);
+        } else {
+            const parentItem = items.length > 1 ? items[items.length - 2] : null;
+            if (parentItem) {
+                if (parentItem.path) {
+                    navigate(parentItem.path);
+                } else if (parentItem.onClick) {
+                    parentItem.onClick();
+                } else {
+                    navigate("/");
+                }
+            } else {
+                navigate("/");
+            }
+        }
+    };
+
     return (
         <div className={`flex items-center gap-2 text-label-sm font-medium text-on-surface-variant mb-5 bg-surface-container-low p-2 rounded border border-outline-variant w-fit ${className}`}>
             {showBackButton && (
                 <button 
-                    onClick={onBackClick || (() => navigate(-1))} 
+                    onClick={handleBackClick} 
                     className="p-1 hover:bg-surface-container-highest rounded transition-colors text-on-surface-variant hover:text-on-surface cursor-pointer"
                 >
                     <HiOutlineArrowLeft size={14} />

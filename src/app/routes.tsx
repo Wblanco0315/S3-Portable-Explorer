@@ -10,11 +10,13 @@ import BucketExplorerPage from "../pages/bucketExplorer";
 import DownloadsPage from "../pages/downloads";
 import FavoritesPage from "../pages/favorites";
 import SettingsPage from "../pages/settings";
+import ErrorPage from "../pages/ErrorPage";
 
 let routesConfig: RouteObject[] = [
   {
     path: "/",
     element: <DefaultLayout />,
+    errorElement: <ErrorPage />,
     children: [
       {
         index: true,

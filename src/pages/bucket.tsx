@@ -23,10 +23,12 @@ import { getLocalSSOCredentials } from "../features/aws/awsCli";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { useDatabase } from "../shared/hooks/useDatabase";
+import { useTranslation } from "react-i18next";
 
 export default function BucketPage() {
   const navigate = useNavigate();
   const { getSetting, saveSetting, logAction } = useDatabase();
+  const { t } = useTranslation();
 
   // Basic States
   const [isAuthenticated, setIsAuthenticated] = useState(isAwsAuthenticated());
@@ -170,7 +172,7 @@ export default function BucketPage() {
       const storedRoleName = localStorage.getItem("aws_sso_role_name");
 
       if (storedAccountId && storedRoleName) {
-        setSsoStatusMessage("Restaurando credenciales de rol AWS...");
+        setSsoStatusMessage(t("buckets.handshake_sts_status"));
         setSsoAuthStep('loading_credentials');
 
         try {
@@ -203,19 +205,19 @@ export default function BucketPage() {
       }
 
       // If no stored role/account or auto-login failed, fall back to account list
-      setSsoStatusMessage("Obteniendo cuentas de AWS habilitadas...");
+      setSsoStatusMessage(t("buckets.fetching_sso_accounts_status"));
       setSsoAuthStep('select_account');
       const accountsList = await listAwsAccounts(storedToken, targetRegion);
       setSsoAccounts(accountsList);
 
       if (accountsList.length === 0) {
-        throw new Error("No tienes cuentas de AWS vinculadas a tu perfil de SSO.");
+        throw new Error(t("buckets.no_accounts_linked"));
       }
       setIsLoading(false);
       return true;
     } catch (err: any) {
       console.error("Failed to restore SSO session:", err);
-      setError(err.message || "No se pudo restaurar la sesión de SSO.");
+      setError(err.message || t("buckets.error_getting_role_creds"));
       setSsoAuthStep('idle');
       setIsLoading(false);
       return false;
@@ -267,7 +269,7 @@ export default function BucketPage() {
     }
     
     // Log visit action
-    logAction("visit", "Visited Buckets list");
+    logAction("visit", t("buckets.visited_buckets_action"));
   }, []);
 
   // Automatic SSO connect on refresh if using local CLI SSO profile
@@ -322,14 +324,14 @@ export default function BucketPage() {
       const errorMsg = err.message || "Failed to authenticate or fetch buckets";
       if (errorMsg.includes("Missing the following required SSO configuration values")) {
         setSsoNeedsConfig(true);
-        setError("SSO is not configured for this profile.");
+        setError(t("buckets.sso_not_configured", { profile: targetProfile }));
       } else if (
         errorMsg.toLowerCase().includes("expired") ||
         errorMsg.toLowerCase().includes("refresh failed") ||
         errorMsg.toLowerCase().includes("login first")
       ) {
         setSsoNeedsLogin(true);
-        setError("Your SSO token has expired. You need to log in again.");
+        setError(t("buckets.sso_session_expired"));
       } else {
         setError(errorMsg);
       }
@@ -343,7 +345,7 @@ export default function BucketPage() {
   const handleStartNativeSso = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!ssoStartUrl) {
-      setError("Por favor configura un Start URL corporativo en Ajustes o en el formulario.");
+      setError(t("buckets.enter_start_url_error"));
       return;
     }
 
@@ -361,7 +363,7 @@ export default function BucketPage() {
       if (!isNaN(expiresAt) && expiresAt > Date.now()) {
         setSsoToken(storedToken);
         setSsoAuthStep('select_account');
-        setSsoStatusMessage("Obteniendo cuentas de AWS habilitadas...");
+        setSsoStatusMessage(t("buckets.fetching_sso_accounts_status"));
 
         try {
           const { listAwsAccounts } = await import("../features/aws/awsSsoOidc");
@@ -369,7 +371,7 @@ export default function BucketPage() {
           setSsoAccounts(accountsList);
 
           if (accountsList.length === 0) {
-            throw new Error("No tienes cuentas de AWS vinculadas a tu perfil corporativo de SSO.");
+            throw new Error(t("buckets.no_accounts_linked"));
           }
           setIsLoading(false);
           return;
@@ -381,7 +383,7 @@ export default function BucketPage() {
     }
 
     setSsoAuthStep('authorizing');
-    setSsoStatusMessage("Registrando aplicación corporativa con AWS OIDC...");
+    setSsoStatusMessage(t("buckets.registering_sso_app"));
 
     try {
       const { startSsoOidcFlow, pollForOidcToken, listAwsAccounts } = await import("../features/aws/awsSsoOidc");
@@ -398,10 +400,10 @@ export default function BucketPage() {
       try {
         const { openUrl } = await import("@tauri-apps/plugin-opener");
         await openUrl(auth.verificationUriComplete);
-        setSsoStatusMessage("¡Navegador abierto! Confirma el código para iniciar sesión.");
+        setSsoStatusMessage(t("buckets.browser_opened_confirm"));
       } catch (openErr) {
         console.warn("Navegador no abierto automáticamente", openErr);
-        setSsoStatusMessage("Por favor ingresa al enlace abajo y digita el código de confirmación.");
+        setSsoStatusMessage(t("buckets.browser_not_opened"));
       }
 
       // Poll OIDC access token
@@ -428,19 +430,19 @@ export default function BucketPage() {
 
       setSsoToken(token);
       setSsoAuthStep('select_account');
-      setSsoStatusMessage("Obteniendo cuentas de AWS habilitadas...");
+      setSsoStatusMessage(t("buckets.fetching_sso_accounts_status"));
 
       // Fetch accounts
       const accountsList = await listAwsAccounts(token, ssoRegion.trim() || "us-east-1");
       setSsoAccounts(accountsList);
 
       if (accountsList.length === 0) {
-        throw new Error("No tienes cuentas de AWS vinculadas a tu perfil corporativo de SSO.");
+        throw new Error(t("buckets.no_accounts_linked"));
       }
     } catch (err: any) {
       console.error(err);
       if (!ssoCancelledRef.current) {
-        setError(err.message || "Fallo en el inicio de sesión nativo de SSO.");
+        setError(err.message || t("buckets.error_getting_role_creds"));
         setSsoAuthStep('idle');
       }
     } finally {
@@ -460,10 +462,10 @@ export default function BucketPage() {
       setSsoRoles(rolesList);
 
       if (rolesList.length === 0) {
-        throw new Error(`Tu usuario no tiene roles habilitados en la cuenta ${account.accountName}.`);
+        throw new Error(t("buckets.no_roles_enabled", { account: account.accountName }));
       }
     } catch (err: any) {
-      setError(err.message || "Error cargando roles de la cuenta.");
+      setError(err.message || t("buckets.error_loading_roles"));
       setSsoAuthStep('select_account');
     } finally {
       setIsLoading(false);
@@ -516,7 +518,7 @@ export default function BucketPage() {
         navigate(pendingRedirect);
       }
     } catch (err: any) {
-      setError(err.message || "Error obteniendo credenciales del rol.");
+      setError(err.message || t("buckets.error_getting_role_creds"));
       setSsoAuthStep('select_role');
     } finally {
       setIsLoading(false);
@@ -562,7 +564,7 @@ export default function BucketPage() {
         setSsoToken(storedToken);
         setActiveTab("native_sso");
         setSsoAuthStep('select_account');
-        setSsoStatusMessage("Obteniendo cuentas de AWS habilitadas...");
+        setSsoStatusMessage(t("buckets.fetching_sso_accounts_status"));
         try {
           const { listAwsAccounts } = await import("../features/aws/awsSsoOidc");
           const accountsList = await listAwsAccounts(storedToken, targetRegion);
@@ -571,7 +573,7 @@ export default function BucketPage() {
           return;
         } catch (err: any) {
           console.error("Failed to list accounts on logout:", err);
-          setError(err.message || "No se pudieron cargar las cuentas de AWS.");
+          setError(err.message || t("buckets.error_getting_accounts"));
         }
       }
     }
@@ -586,7 +588,7 @@ export default function BucketPage() {
       const bucketList = await getBuckets();
       setBuckets(bucketList);
     } catch (err: any) {
-      setError(err.message || "Failed to fetch buckets");
+      setError(err.message || t("buckets.error_getting_accounts"));
     } finally {
       setIsLoading(false);
     }
@@ -595,7 +597,7 @@ export default function BucketPage() {
   const columns: Column<any>[] = [
     {
       key: "Name",
-      header: "Name",
+      header: t("buckets.name_col"),
       sortable: true,
       render: (bucket) => (
         <div className="flex items-center gap-3">
@@ -610,7 +612,7 @@ export default function BucketPage() {
     },
     {
       key: "CreationDate",
-      header: "Creation date",
+      header: t("buckets.date_col"),
       sortable: true,
       className: "text-on-surface-variant font-medium text-body-md",
       render: (bucket) =>
@@ -620,7 +622,7 @@ export default function BucketPage() {
     },
     {
       key: "Region",
-      header: "AWS Region",
+      header: t("buckets.region_col"),
       render: () => (
         <span className="px-1.5 py-0.5 bg-surface-container-high text-on-surface-variant font-medium text-label-sm rounded-sm uppercase border border-outline-variant tracking-wider font-mono">
           {region || ssoRegion || "us-east-1"}
@@ -629,7 +631,7 @@ export default function BucketPage() {
     },
     {
       key: "actions",
-      header: "Actions",
+      header: t("buckets.actions_col"),
       className: "text-right",
       render: () => (
         <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -660,20 +662,20 @@ export default function BucketPage() {
                 </div>
                 <div>
                   <h2 className="text-headline-md font-bold text-on-surface tracking-tight">
-                    {activeTab === 'native_sso' ? "AWS Enterprise SSO" : "AWS Access Local"}
+                    {activeTab === 'native_sso' ? t("buckets.enterprise_sso") : t("buckets.access_local")}
                   </h2>
                   <p className="text-body-md text-on-surface-variant">
                     {ssoAuthStep === 'select_method'
-                      ? "Selecciona un método de conexión"
+                      ? t("buckets.steps.select_method")
                       : ssoAuthStep === 'idle'
-                        ? "Configura las credenciales de acceso"
+                        ? t("buckets.steps.configure_access")
                         : ssoAuthStep === 'authorizing'
-                          ? "Autoriza la sesión en tu navegador"
+                          ? t("buckets.steps.authorize_session")
                           : ssoAuthStep === 'select_account'
-                            ? "Elige una cuenta de AWS"
+                            ? t("buckets.steps.choose_account")
                             : ssoAuthStep === 'select_role'
-                              ? "Selecciona tu rol de IAM"
-                              : "Cargando credenciales de AWS"}
+                              ? t("buckets.steps.select_role")
+                              : t("buckets.steps.loading_creds")}
                   </p>
                 </div>
               </div>
@@ -694,7 +696,7 @@ export default function BucketPage() {
                         ? 'text-on-surface'
                         : 'text-on-surface-variant font-medium'
                         }`}>
-                        Conectar
+                        {t("buckets.wizard.step_connect")}
                       </span>
                     </div>
                     <div className="w-6 h-0.5 bg-outline-variant"></div>
@@ -716,7 +718,7 @@ export default function BucketPage() {
                         ? 'text-on-surface'
                         : 'text-on-surface-variant'
                         }`}>
-                        Cuentas
+                        {t("buckets.wizard.step_accounts")}
                       </span>
                     </div>
                     <div className="w-6 h-0.5 bg-outline-variant"></div>
@@ -736,7 +738,7 @@ export default function BucketPage() {
                         ? 'text-on-surface'
                         : 'text-on-surface-variant'
                         }`}>
-                        Roles
+                        {t("buckets.wizard.step_roles")}
                       </span>
                     </div>
                   </>
@@ -754,7 +756,7 @@ export default function BucketPage() {
                         ? 'text-on-surface'
                         : 'text-on-surface-variant font-medium'
                         }`}>
-                        Conectar
+                        {t("buckets.wizard.step_connect")}
                       </span>
                     </div>
                   </>
@@ -775,8 +777,8 @@ export default function BucketPage() {
             {ssoAuthStep === 'select_method' && (
               <div className="space-y-6 max-w-5xl mx-auto w-full py-4 animate-in fade-in duration-300">
                 <div className="text-center space-y-2 mb-6">
-                  <h3 className="text-headline-lg font-bold text-on-surface">Método de Autenticación</h3>
-                  <p className="text-body-md text-on-surface-variant">Selecciona cómo deseas autenticarte con tu cuenta de AWS.</p>
+                  <h3 className="text-headline-lg font-bold text-on-surface">{t("buckets.select_method_title")}</h3>
+                  <p className="text-body-md text-on-surface-variant">{t("buckets.select_method_desc")}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
@@ -799,16 +801,16 @@ export default function BucketPage() {
                       <HiOutlineKey className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
-                      <h4 className="font-bold text-headline-md text-on-surface">Local AWS Profile</h4>
+                      <h4 className="font-bold text-headline-md text-on-surface">{t("buckets.local_profile_title")}</h4>
                       <p className="text-body-md text-on-surface-variant leading-relaxed max-w-xs">
-                        Autentícate usando los archivos de credenciales locales del sistema (.aws/credentials).
+                        {t("buckets.local_profile_desc")}
                       </p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-sm text-label-sm font-mono font-medium uppercase tracking-wider ${activeTab === 'profile'
                       ? 'bg-primary-container text-on-primary-container'
                       : 'bg-surface-container text-on-surface-variant border border-outline-variant'
                       }`}>
-                      Direct Connect
+                      {t("buckets.direct_connect")}
                     </span>
                   </div>
 
@@ -831,16 +833,16 @@ export default function BucketPage() {
                       <HiOutlineShieldCheck className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
-                      <h4 className="font-bold text-headline-md text-on-surface">Corporate SSO (Nativo)</h4>
+                      <h4 className="font-bold text-headline-md text-on-surface">{t("buckets.corp_sso_title")}</h4>
                       <p className="text-body-md text-on-surface-variant leading-relaxed max-w-xs">
-                        Inicia sesión de forma nativa a través del portal de AWS IAM Identity Center corporativo.
+                        {t("buckets.corp_sso_desc")}
                       </p>
                     </div>
                     <span className={`px-2 py-0.5 rounded-sm text-label-sm font-mono font-medium uppercase tracking-wider ${activeTab === 'native_sso'
                       ? 'bg-primary-container text-on-primary-container'
                       : 'bg-surface-container text-on-surface-variant border border-outline-variant'
                       }`}>
-                      Enterprise Identity
+                      {t("buckets.enterprise_identity")}
                     </span>
                   </div>
                 </div>
@@ -853,8 +855,8 @@ export default function BucketPage() {
                   // Local Profile Configuration Form
                   <form onSubmit={handleProfileLogin} className="space-y-4">
                     <div className="text-center space-y-2 mb-4">
-                      <h3 className="text-headline-md font-bold text-on-surface">Configurar Perfil AWS</h3>
-                      <p className="text-body-md text-on-surface-variant">Selecciona el perfil local y la región para explorar.</p>
+                      <h3 className="text-headline-md font-bold text-on-surface">{t("buckets.config_local_title")}</h3>
+                      <p className="text-body-md text-on-surface-variant">{t("buckets.config_local_desc")}</p>
                     </div>
 
                     <div className="space-y-1.5">
@@ -869,7 +871,7 @@ export default function BucketPage() {
                           }}
                           className="text-label-sm font-bold text-primary uppercase tracking-wider hover:underline flex items-center gap-1 cursor-pointer font-mono"
                         >
-                          + Nuevo
+                          {t("buckets.new_profile")}
                         </button>
                       </div>
 
@@ -900,7 +902,7 @@ export default function BucketPage() {
                               setProfile(e.target.value);
                               setSsoNeedsConfig(false);
                             }}
-                            placeholder="Nombre del perfil"
+                            placeholder={t("buckets.profile_name_placeholder")}
                             className="flex-1 px-3 py-2 rounded border border-outline-variant bg-surface-container text-body-md text-on-surface focus:outline-none focus:border-primary transition-all font-mono"
                             required
                             autoFocus
@@ -912,7 +914,7 @@ export default function BucketPage() {
                               try {
                                 const { openTerminalForSSO } = await import("../features/aws/awsCli");
                                 await openTerminalForSSO(profile);
-                                setError(`Consola abierta. Configura '${profile}' y conéctate.`);
+                                setError(t("buckets.console_opened_msg", { profile }));
                                 setIsCreatingProfile(false);
                                 if (!availableProfiles.includes(profile)) {
                                   setAvailableProfiles([...availableProfiles, profile]);
@@ -923,7 +925,7 @@ export default function BucketPage() {
                             }}
                             className="px-4 py-2 bg-primary hover:bg-primary/95 text-on-primary text-label-sm font-bold rounded cursor-pointer transition-colors"
                           >
-                            Configurar
+                            {t("buckets.configure_btn")}
                           </button>
                           <button
                             type="button"
@@ -933,7 +935,7 @@ export default function BucketPage() {
                             }}
                             className="px-3 py-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant text-label-sm font-bold rounded cursor-pointer transition-colors border border-outline-variant"
                           >
-                            Cancelar
+                            {t("buckets.cancel_btn")}
                           </button>
                         </div>
                       )}
@@ -954,7 +956,7 @@ export default function BucketPage() {
                     {ssoNeedsConfig && (
                       <div className="p-4 bg-surface-container border border-outline-variant rounded animate-in slide-in-from-top-2">
                         <p className="text-body-md text-primary font-bold">
-                          SSO no está configurado para '${profile}'
+                          {t("buckets.sso_not_configured", { profile })}
                         </p>
                         <button
                           type="button"
@@ -963,14 +965,14 @@ export default function BucketPage() {
                               const { openTerminalForSSO } = await import("../features/aws/awsCli");
                               await openTerminalForSSO(profile);
                               setSsoNeedsConfig(false);
-                              setError("Configura SSO en la consola y presiona Conectar.");
+                              setError(t("buckets.console_opened_msg", { profile }));
                             } catch (err: any) {
                               setError(err.message);
                             }
                           }}
                           className="mt-2.5 w-full py-2 bg-primary text-on-primary text-label-sm font-bold rounded hover:bg-primary/95 transition-all cursor-pointer"
                         >
-                          Configurar SSO en consola
+                          {t("buckets.config_sso_console")}
                         </button>
                       </div>
                     )}
@@ -978,10 +980,10 @@ export default function BucketPage() {
                     {ssoNeedsLogin && (
                       <div className="p-4 bg-surface-container border border-outline-variant rounded animate-in slide-in-from-top-2">
                         <p className="text-body-md text-primary font-bold">
-                          Sesión SSO Expirada
+                          {t("buckets.sso_session_expired")}
                         </p>
                         <p className="text-body-md text-on-surface-variant mt-1.5 font-medium leading-relaxed font-sans">
-                          La sesión ha expirado. Haz clic abajo para re-autenticarte en el navegador.
+                          {t("buckets.sso_session_expired_desc")}
                         </p>
                         <button
                           type="button"
@@ -993,17 +995,17 @@ export default function BucketPage() {
                               const { triggerSSOLogin } = await import("../features/aws/awsCli");
                               await triggerSSOLogin(profile);
                               setSsoNeedsLogin(false);
-                              setError("Sesión SSO iniciada. Conectando...");
+                              setError(t("buckets.sso_logged_in_msg"));
                               await handleProfileLogin();
                             } catch (err: any) {
-                              setError(err.message || "Error al iniciar sesión SSO");
+                              setError(err.message || t("buckets.sso_session_expired"));
                             } finally {
                               setIsLoading(false);
                             }
                           }}
                           className="mt-2.5 w-full py-2 bg-primary text-on-primary text-label-sm font-bold rounded hover:bg-primary/95 transition-all cursor-pointer"
                         >
-                          Iniciar Sesión en AWS SSO
+                          {t("buckets.sso_login_btn")}
                         </button>
                       </div>
                     )}
@@ -1014,19 +1016,19 @@ export default function BucketPage() {
                     {ssoStartUrl && !isEditingSsoConfig ? (
                       <div className="space-y-4">
                         <div className="text-center space-y-2 mb-4">
-                          <h3 className="text-headline-md font-bold text-on-surface">Conexión SSO Corporativa</h3>
-                          <p className="text-body-md text-on-surface-variant">Utiliza la URL de inicio configurada a continuación.</p>
+                          <h3 className="text-headline-md font-bold text-on-surface">{t("buckets.sso_conn_title")}</h3>
+                          <p className="text-body-md text-on-surface-variant">{t("buckets.sso_conn_desc")}</p>
                         </div>
 
                         <div className="p-4 bg-surface-container border border-outline-variant rounded-lg">
                           <div className="flex justify-between items-center mb-3">
-                            <span className="text-label-sm uppercase font-bold tracking-widest text-on-surface-variant font-mono">Configuración SSO Activa</span>
+                            <span className="text-label-sm uppercase font-bold tracking-widest text-on-surface-variant font-mono">{t("buckets.sso_config_active")}</span>
                             <button
                               type="button"
                               onClick={() => setIsEditingSsoConfig(true)}
                               className="px-2.5 py-1 text-label-sm font-mono text-primary bg-surface-container-high border border-outline-variant hover:bg-surface-container-highest rounded transition-all cursor-pointer"
                             >
-                              Editar
+                              {t("buckets.edit_btn")}
                             </button>
                           </div>
                           <div className="space-y-2">
@@ -1045,14 +1047,14 @@ export default function BucketPage() {
                           <div className="flex items-center justify-between p-4 bg-surface-container border border-outline-variant rounded-lg">
                             <div className="flex items-center gap-2.5 text-primary">
                               <HiOutlineShieldCheck className="w-5 h-5 shrink-0" />
-                              <span className="text-body-md font-bold">Sesión SSO Activa</span>
+                              <span className="text-body-md font-bold">{t("buckets.sso_session_active")}</span>
                             </div>
                             <button
                               type="button"
                               onClick={handleClearSsoSession}
                               className="px-3 py-1.5 text-label-sm font-mono text-error bg-surface-container-high border border-outline-variant hover:bg-surface-container-highest rounded transition-all cursor-pointer"
                             >
-                              Cerrar Sesión SSO
+                              {t("buckets.sign_out_sso")}
                             </button>
                           </div>
                         )}
@@ -1060,8 +1062,8 @@ export default function BucketPage() {
                     ) : (
                       <div className="space-y-4">
                         <div className="text-center space-y-2 mb-4">
-                          <h3 className="text-headline-md font-bold text-on-surface">Configurar SSO</h3>
-                          <p className="text-body-md text-on-surface-variant">Ingresa la URL del portal corporativo de Identity Center.</p>
+                          <h3 className="text-headline-md font-bold text-on-surface">{t("buckets.config_sso_title")}</h3>
+                          <p className="text-body-md text-on-surface-variant">{t("buckets.config_sso_desc")}</p>
                         </div>
 
                         <div className="space-y-1.5">
@@ -1099,10 +1101,10 @@ export default function BucketPage() {
               <div className="space-y-4 text-center animate-in fade-in duration-300 max-w-md mx-auto w-full py-4">
                 <div className="p-4 bg-surface-container border border-outline-variant rounded-lg">
                   <p className="text-body-lg font-bold text-on-surface">
-                    Hemos abierto el navegador de tu empresa para autorizar el inicio de sesión.
+                    {t("buckets.browser_opened_title")}
                   </p>
                   <p className="text-body-md text-on-surface-variant mt-2">
-                    Si la página no abrió automáticamente, ingresa de manera manual a:
+                    {t("buckets.browser_manual_desc")}
                   </p>
                   <a
                     href={ssoVerificationUrl || "#"}
@@ -1116,7 +1118,7 @@ export default function BucketPage() {
 
                 <div className="bg-surface-container-low p-4 rounded-lg border border-outline-variant relative overflow-hidden">
                   <span className="text-label-sm uppercase font-bold tracking-widest text-on-surface-variant block mb-1.5 font-mono">
-                    Código de Validación
+                    {t("buckets.validation_code")}
                   </span>
                   <span className="text-3xl font-mono font-bold tracking-widest text-tertiary block selection:bg-tertiary/20">
                     {ssoUserCode}
@@ -1126,7 +1128,7 @@ export default function BucketPage() {
                 <div className="flex items-center justify-center gap-3">
                   <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   <span className="text-body-md font-medium text-on-surface-variant animate-pulse">
-                    {ssoStatusMessage || "Esperando aprobación..."}
+                    {ssoStatusMessage || t("buckets.waiting_approval")}
                   </span>
                 </div>
               </div>
@@ -1138,10 +1140,10 @@ export default function BucketPage() {
                 <div>
                   <h3 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
                     <HiOutlineOfficeBuilding className="w-5 h-5 text-primary" />
-                    Cuentas AWS Disponibles
+                    {t("buckets.available_accounts_title")}
                   </h3>
                   <p className="text-body-md text-on-surface-variant mt-1">
-                    Selecciona el inquilino corporativo de AWS al que deseas acceder en esta sesión.
+                    {t("buckets.available_accounts_desc")}
                   </p>
                 </div>
 
@@ -1154,7 +1156,7 @@ export default function BucketPage() {
                     type="text"
                     value={accountSearchTerm}
                     onChange={(e) => setAccountSearchTerm(e.target.value)}
-                    placeholder="Buscar por nombre o ID de cuenta..."
+                    placeholder={t("buckets.search_accounts_placeholder")}
                     className="w-full pl-9 pr-4 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all font-mono"
                   />
                 </div>
@@ -1184,13 +1186,13 @@ export default function BucketPage() {
 
                   {filteredSsoAccounts.length === 0 && (
                     <div className="col-span-full py-8 text-center text-body-md text-on-surface-variant">
-                      No se encontraron cuentas vinculadas.
+                      {t("buckets.no_accounts_found")}
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center justify-between text-label-sm text-on-surface-variant pt-2 border-t border-outline-variant/30 font-mono">
-                  <span>Mostrando {filteredSsoAccounts.length} de {ssoAccounts.length} cuentas</span>
+                  <span>{t("buckets.showing_accounts", { filtered: filteredSsoAccounts.length, total: ssoAccounts.length })}</span>
                 </div>
               </div>
             )}
@@ -1218,10 +1220,10 @@ export default function BucketPage() {
                   <div>
                     <h3 className="text-headline-md font-bold text-on-surface flex items-center gap-2">
                       <HiOutlineShieldCheck className="w-5 h-5 text-primary" />
-                      Selecciona tu Rol de IAM
+                      {t("buckets.select_role_title")}
                     </h3>
                     <p className="text-body-md text-on-surface-variant mt-1">
-                      Elige la identidad autorizada con políticas de confianza para el explorer.
+                      {t("buckets.select_role_desc")}
                     </p>
                   </div>
 
@@ -1246,7 +1248,7 @@ export default function BucketPage() {
                   <div className="p-3 bg-surface-container border border-outline-variant rounded flex items-start gap-3">
                     <HiOutlineShieldCheck className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                     <span className="text-body-md text-on-surface-variant leading-normal font-sans">
-                      Al seleccionar este rol se iniciará un apretón de manos (handshake) con AWS Security Token Service (STS) para generar credenciales temporales.
+                      {t("buckets.role_warning")}
                     </span>
                   </div>
                 </div>
@@ -1258,10 +1260,10 @@ export default function BucketPage() {
               <div className="space-y-4 text-center py-8 animate-in fade-in duration-300 max-w-md mx-auto w-full">
                 <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                 <h3 className="text-headline-md font-bold text-on-surface">
-                  Obteniendo credenciales de AWS...
+                  {t("buckets.fetching_creds")}
                 </h3>
                 <p className="text-body-md text-on-surface-variant leading-relaxed max-w-xs mx-auto">
-                  Generando llaves temporales y tokens de sesión para el rol {ssoSelectedRole?.roleName}.
+                  {t("buckets.generating_keys_desc", { role: ssoSelectedRole?.roleName })}
                 </p>
               </div>
             )}
@@ -1289,7 +1291,7 @@ export default function BucketPage() {
                 }`}
             >
               <HiOutlineChevronLeft className="w-4.5 h-4.5" />
-              Atrás
+              {t("buckets.wizard.back")}
             </button>
 
             {/* Cancel Button */}
@@ -1300,7 +1302,7 @@ export default function BucketPage() {
                 className="px-4 py-2 rounded bg-error-container hover:bg-error-container/90 text-on-error-container border border-error/20 text-body-md font-medium transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <HiOutlineX className="w-4 h-4" />
-                Cancelar
+                {t("buckets.wizard.cancel")}
               </button>
             )}
 
@@ -1322,7 +1324,7 @@ export default function BucketPage() {
                   <div className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    Conectar
+                    {t("buckets.wizard.connect")}
                     <HiOutlineChevronRight className="w-4.5 h-4.5" />
                   </>
                 )}
@@ -1333,7 +1335,7 @@ export default function BucketPage() {
                 onClick={() => setSsoAuthStep('idle')}
                 className="px-5 py-2 bg-primary hover:bg-primary/95 text-on-primary text-body-md font-medium rounded transition-all flex items-center gap-2 cursor-pointer active:scale-95 border border-transparent"
               >
-                Siguiente
+                {t("buckets.wizard.next")}
                 <HiOutlineChevronRight className="w-4.5 h-4.5" />
               </button>
             ) : (
@@ -1354,14 +1356,14 @@ export default function BucketPage() {
             <Breadcrumb
               items={[
                 { label: getAwsAccountDisplayName(), path: "/" },
-                { label: "Buckets", active: true },
+                { label: t("buckets.title"), active: true },
               ]}
             />
             <h1 className="text-headline-lg font-bold text-on-surface tracking-tight flex items-center gap-2">
               <div className="p-1.5 bg-surface-container-high text-primary border border-outline-variant rounded">
                 <HiOutlineDatabase size={20} />
               </div>
-              Buckets
+              {t("buckets.title")}
             </h1>
           </div>
 
@@ -1377,7 +1379,7 @@ export default function BucketPage() {
                     setSsoToken(storedToken);
                     setActiveTab("native_sso");
                     setSsoAuthStep('select_account');
-                    setSsoStatusMessage("Obteniendo cuentas de AWS habilitadas...");
+                    setSsoStatusMessage(t("buckets.fetching_sso_accounts_status"));
                     setIsAuthenticated(false);
                     try {
                       const { listAwsAccounts } = await import("../features/aws/awsSsoOidc");
@@ -1385,40 +1387,40 @@ export default function BucketPage() {
                       setSsoAccounts(accountsList);
                     } catch (err: any) {
                       console.error("Failed to switch account:", err);
-                      setError(err.message || "Error al obtener las cuentas de AWS.");
+                      setError(err.message || t("buckets.error_getting_accounts"));
                       setSsoAuthStep('idle');
                     } finally {
                       setIsLoading(false);
                     }
                   } else {
-                    setError("No hay sesión SSO activa.");
+                    setError(t("buckets.no_sso_session"));
                   }
                 }}
                 disabled={isLoading}
                 className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-primary font-medium text-body-md rounded hover:bg-surface-container-high transition-all cursor-pointer"
-                title="Cambiar Cuenta o Rol"
+                title={t("buckets.change_account_role")}
               >
                 <HiOutlineOfficeBuilding className="w-5 h-5" />
-                Cambiar Cuenta/Rol
+                {t("buckets.change_account_role")}
               </button>
             )}
             <button
               onClick={handleRefresh}
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface font-medium text-body-md rounded hover:bg-surface-container-high transition-all cursor-pointer disabled:opacity-50"
-              title="Refresh buckets list"
+              title={t("buckets.refresh")}
             >
               <HiOutlineRefresh
                 className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
               />
-              Refresh
+              {t("buckets.refresh")}
             </button>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 bg-error-container/20 border border-error/20 text-error font-medium text-body-md rounded hover:bg-error-container/30 transition-all cursor-pointer"
-              title="Sign out"
+              title={t("buckets.sign_out")}
             >
-              Sign out
+              {t("buckets.sign_out")}
               <HiOutlineLogout className="w-5 h-5" />
             </button>
           </div>
@@ -1444,13 +1446,13 @@ export default function BucketPage() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Find buckets by name..."
+                placeholder={t("buckets.search_placeholder")}
                 className="w-full pl-9 pr-4 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
-                aria-label="Search buckets"
+                aria-label={t("buckets.search_placeholder")}
               />
             </div>
             <div className="text-label-sm font-medium text-on-surface-variant font-mono uppercase tracking-wider">
-              {currentBuckets.length} / {buckets.length} Buckets
+              {currentBuckets.length} / {buckets.length} {t("buckets.title")}
             </div>
           </div>
 
@@ -1462,7 +1464,7 @@ export default function BucketPage() {
             onRowClick={(b) => navigate(`/buckets/${b.Name}`)}
             sortConfig={sortConfig}
             onSort={handleSort}
-            emptyMessage="No buckets found"
+            emptyMessage={t("buckets.empty_buckets")}
             emptyIcon={<HiOutlineDatabase size={22} />}
           />
         </div>

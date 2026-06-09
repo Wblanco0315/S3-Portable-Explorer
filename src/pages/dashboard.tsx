@@ -6,8 +6,10 @@ import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { Link } from "react-router-dom";
 import { getStatsSummary, StatsSummary } from "../features/statistics/statisticsDatabase";
+import { useTranslation } from "react-i18next";
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { navigateToRoute } = useRouteNavigator();
   const { getActionLogs } = useDatabase();
   const { tasks, initialize: initDownloads } = useDownloadStore();
@@ -51,7 +53,7 @@ export default function DashboardPage() {
 
   // Map display period key
   const periodKey: 'daily' | 'weekly' | 'monthly' = selectedPeriod;
-  const periodLabel = selectedPeriod === 'daily' ? "Today" : selectedPeriod === 'weekly' ? "This Week" : "This Month";
+  const periodLabel = selectedPeriod === 'daily' ? t("dashboard.trends.today") : selectedPeriod === 'weekly' ? t("dashboard.trends.week") : t("dashboard.trends.month");
 
   const completedDownloadsCount = summary ? summary[periodKey].completedDownloads : 0;
   const storageVal = summary ? formatBytes(summary[periodKey].storageDownloaded) : "0 B";
@@ -64,9 +66,9 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-headline-lg font-bold text-on-surface">
-            Welcome Back
+            {t("dashboard.welcome")}
           </h1>
-          <p className="text-on-surface-variant text-body-md mt-1">Here's what's happening with your S3 backups today.</p>
+          <p className="text-on-surface-variant text-body-md mt-1">{t("dashboard.subtitle")}</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -92,7 +94,7 @@ export default function DashboardPage() {
                 : "text-on-surface-variant hover:text-on-surface"
                 }`}
             >
-              Today
+              {t("dashboard.periods.today")}
             </button>
             <button
               onClick={() => setSelectedPeriod('weekly')}
@@ -101,7 +103,7 @@ export default function DashboardPage() {
                 : "text-on-surface-variant hover:text-on-surface"
                 }`}
             >
-              Week
+              {t("dashboard.periods.week")}
             </button>
             <button
               onClick={() => setSelectedPeriod('monthly')}
@@ -110,7 +112,7 @@ export default function DashboardPage() {
                 : "text-on-surface-variant hover:text-on-surface"
                 }`}
             >
-              Month
+              {t("dashboard.periods.month")}
             </button>
           </div>
 
@@ -119,7 +121,7 @@ export default function DashboardPage() {
             className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium text-body-md rounded border border-transparent hover:bg-primary/95 transition-all duration-200 cursor-pointer"
           >
             <HiOutlineDatabase className="w-5 h-5" />
-            Explore Buckets
+            {t("dashboard.explore")}
           </Link>
         </div>
       </div>
@@ -127,21 +129,21 @@ export default function DashboardPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
-          title="Completed Downloads"
+          title={t("dashboard.completed_downloads")}
           value={String(completedDownloadsCount)}
           trend={periodLabel}
           icon={<HiOutlineDownload className="w-5 h-5 text-primary" />}
         />
         <StatCard
-          title="Storage Downloaded"
+          title={t("dashboard.storage_downloaded")}
           value={storageVal}
           trend={periodLabel}
           icon={<HiOutlineChartBar className="w-5 h-5 text-tertiary" />}
         />
         <StatCard
-          title="Active Buckets (Routes)"
+          title={t("dashboard.active_buckets")}
           value={String(activeBucketsCount)}
-          trend={`${activeRoutesCount} routes active`}
+          trend={`${activeRoutesCount} ${t("dashboard.active_routes_trend")}`}
           icon={<HiOutlineDatabase className="w-5 h-5 text-secondary" />}
         />
       </div>
@@ -153,7 +155,7 @@ export default function DashboardPage() {
             <div className="p-2 bg-surface-container-high text-primary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineLink className="w-5 h-5" />
             </div>
-            <h2 className="text-headline-md text-on-surface font-semibold">My Routes (Top Visited)</h2>
+            <h2 className="text-headline-md text-on-surface font-semibold">{t("dashboard.my_routes_top")}</h2>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
@@ -176,8 +178,8 @@ export default function DashboardPage() {
                             </span>
                           )}
                           {(rt as any).visit_count > 0 && (
-                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded-sm text-label-sm font-mono border border-primary/20 shrink-0" title={`${(rt as any).visit_count} visitas`}>
-                              {(rt as any).visit_count} visits
+                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded-sm text-label-sm font-mono border border-primary/20 shrink-0" title={`${(rt as any).visit_count} ${t("dashboard.visits")}`}>
+                              {(rt as any).visit_count} {(rt as any).visit_count === 1 ? t("dashboard.visit") : t("dashboard.visits")}
                             </span>
                           )}
                         </div>
@@ -190,8 +192,8 @@ export default function DashboardPage() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline-variant rounded">
                 <HiOutlineLink className="w-8 h-8 text-on-surface-variant mb-2" />
-                <p className="text-body-md text-on-surface font-semibold">No routes yet</p>
-                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Add paths to "My Routes" in the explorer to see them here.</p>
+                <p className="text-body-md text-on-surface font-semibold">{t("dashboard.no_routes")}</p>
+                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">{t("dashboard.no_routes_desc")}</p>
               </div>
             )}
           </div>
@@ -203,7 +205,7 @@ export default function DashboardPage() {
             <div className="p-2 bg-surface-container-high text-tertiary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineClock className="w-5 h-5" />
             </div>
-            <h2 className="text-headline-md text-on-surface font-semibold">Recent Activity</h2>
+            <h2 className="text-headline-md text-on-surface font-semibold">{t("dashboard.recent_activity")}</h2>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
@@ -247,8 +249,8 @@ export default function DashboardPage() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline-variant rounded">
                 <HiOutlineClock className="w-8 h-8 text-on-surface-variant mb-2" />
-                <p className="text-body-md text-on-surface font-semibold">No recent activity</p>
-                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Navigate through buckets or save paths to build your history.</p>
+                <p className="text-body-md text-on-surface font-semibold">{t("dashboard.no_activity")}</p>
+                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">{t("dashboard.no_activity_desc")}</p>
               </div>
             )}
           </div>

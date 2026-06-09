@@ -17,8 +17,10 @@ import { useTheme } from "../ThemeContext";
 import { HiOutlineSun, HiOutlineMoon } from "react-icons/hi";
 import pkg from "../../../package.json";
 import UpdateNotifier from "../../components/updater/UpdateNotifier";
+import { useTranslation } from "react-i18next";
 
 export default function DefaultLayout() {
+  const { t } = useTranslation();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { tasks } = useDownloadStore();
@@ -44,16 +46,16 @@ export default function DefaultLayout() {
   };
 
   const menuItems: NavItem[] = [
-    { name: "Main Menu", path: "", isLink: false }, // Section header
-    { name: "Dashboard", path: "/", icon: HiOutlineChartBar, isLink: true },
+    { name: t("menu.main_menu"), path: "", isLink: false }, // Section header
+    { name: t("menu.dashboard"), path: "/", icon: HiOutlineChartBar, isLink: true },
     {
-      name: "Buckets",
+      name: t("menu.buckets"),
       path: "/buckets",
       icon: HiOutlineDatabase,
       isLink: true,
     },
     {
-      name: "Downloads",
+      name: t("menu.downloads"),
       path: "/downloads",
       icon: HiOutlineDownload,
       isLink: true,
@@ -61,15 +63,15 @@ export default function DefaultLayout() {
     },
 
     {
-      name: "My Routes",
+      name: t("menu.my_routes"),
       path: "/favorites",
       icon: HiOutlineLink,
       isLink: true,
       children: buildFolderTree(null),
     },
 
-    { name: "Other", path: "", isLink: false }, // Section header
-    { name: "Settings", path: "/settings", icon: HiOutlineCog, isLink: true },
+    { name: t("menu.other"), path: "", isLink: false }, // Section header
+    { name: t("menu.settings"), path: "/settings", icon: HiOutlineCog, isLink: true },
   ];
 
   const logo = (
