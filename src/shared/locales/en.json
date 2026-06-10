@@ -70,6 +70,7 @@
     "view_doc": "View Documentation",
     "sso_saved_feedback": "SSO configuration saved",
     "unlink_feedback": "Connection unlinked successfully",
+    "unlink_confirm": "Are you sure you want to unlink the AWS SSO connection?",
     "ninguno": "None",
     "language_label": "Interface Language",
     "language_desc": "Select the application's display language.",
@@ -245,7 +246,9 @@
     "paused": "Paused",
     "resume": "Resume",
     "pause": "Pause",
-    "remove_tooltip": "Remove from history"
+    "remove_tooltip": "Remove from history",
+    "delete_confirm": "Are you sure you want to remove '{{name}}' from the history?",
+    "clear_history_confirm": "Are you sure you want to clear all download history?"
   },
   "my_routes": {
     "title": "My Routes",
@@ -267,6 +270,8 @@
     "import_success": "Favorites imported successfully!",
     "import_error": "Error importing favorites: {{error}}",
     "delete_confirm": "Delete {{count}} items?",
+    "delete_folder_confirm": "Are you sure you want to delete the folder '{{name}}' and all its contents?",
+    "delete_route_confirm": "Are you sure you want to delete the route '{{name}}'?",
     "table": {
       "name_col": "Name",
       "type_col": "Type",

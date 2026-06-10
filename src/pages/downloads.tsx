@@ -14,6 +14,7 @@ import {
 } from 'react-icons/hi';
 import { useDownloadStore, DownloadTask } from '../features/downloads/downloadStore';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { safeConfirm as confirm } from '../shared/utils/dialog';
 import { useTranslation } from 'react-i18next';
 
 const formatSize = (bytes: number) => {
@@ -166,7 +167,15 @@ const DownloadItem = ({
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                        onClick={() => onDelete(task.id)}
+                        onClick={async () => {
+                            const confirmed = await confirm(
+                                t('downloads.delete_confirm', { name: task.fileName }),
+                                { title: t('downloads.title'), kind: 'warning' }
+                            );
+                            if (confirmed) {
+                                onDelete(task.id);
+                            }
+                        }}
                         className="p-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
                         title={t('downloads.remove_tooltip')}
                     >
@@ -220,7 +229,15 @@ export default function DownloadsPage() {
                         <p className="text-body-md text-on-surface-variant mt-1">{t('downloads.subtitle')}</p>
                     </div>
                     <button
-                        onClick={clearHistory}
+                        onClick={async () => {
+                            const confirmed = await confirm(
+                                t('downloads.clear_history_confirm'),
+                                { title: t('downloads.title'), kind: 'warning' }
+                            );
+                            if (confirmed) {
+                                clearHistory();
+                            }
+                        }}
                         className="flex items-center justify-center gap-2 px-4 py-2 text-body-md font-medium text-error bg-surface-container border border-error/20 rounded hover:bg-error-container/25 transition-colors cursor-pointer"
                     >
                         <HiOutlineTrash size={16} />

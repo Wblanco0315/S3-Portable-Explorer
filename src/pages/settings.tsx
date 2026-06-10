@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { safeConfirm as confirm } from "../shared/utils/dialog";
 import { useDatabase } from "../shared/hooks/useDatabase";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { isAwsAuthenticated, clearAwsCredentials } from "../features/aws/s3Client";
@@ -115,6 +116,13 @@ export default function SettingsPage() {
   };
 
   const handleUnlink = async () => {
+    const confirmed = await confirm(
+      t("settings.unlink_confirm"),
+      { title: t("settings.title"), kind: "warning" }
+    );
+    if (!confirmed) {
+      return;
+    }
     clearAwsCredentials();
     localStorage.removeItem("aws_sso_profile");
     localStorage.removeItem("aws_sso_account_id");

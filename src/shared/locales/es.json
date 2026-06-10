@@ -70,6 +70,7 @@
     "view_doc": "Ver Documentación",
     "sso_saved_feedback": "Configuración de SSO guardada",
     "unlink_feedback": "Conexión desvinculada exitosamente",
+    "unlink_confirm": "¿Estás seguro de que deseas desvincular la conexión de AWS SSO?",
     "ninguno": "Ninguno",
     "language_label": "Idioma de la Interfaz",
     "language_desc": "Selecciona el idioma de visualización de la aplicación.",
@@ -245,7 +246,9 @@
     "paused": "Pausado",
     "resume": "Reanudar",
     "pause": "Pausar",
-    "remove_tooltip": "Eliminar del historial"
+    "remove_tooltip": "Eliminar del historial",
+    "delete_confirm": "¿Estás seguro de que deseas eliminar '{{name}}' del historial?",
+    "clear_history_confirm": "¿Estás seguro de que deseas limpiar todo el historial de descargas?"
   },
   "my_routes": {
     "title": "Mis Rutas",
@@ -267,6 +270,8 @@
     "import_success": "¡Rutas importadas con éxito!",
     "import_error": "Error al importar rutas: {{error}}",
     "delete_confirm": "¿Eliminar {{count}} ítems?",
+    "delete_folder_confirm": "¿Estás seguro de que deseas eliminar la carpeta '{{name}}' y todo su contenido?",
+    "delete_route_confirm": "¿Estás seguro de que deseas eliminar la ruta '{{name}}'?",
     "table": {
       "name_col": "Nombre",
       "type_col": "Tipo",

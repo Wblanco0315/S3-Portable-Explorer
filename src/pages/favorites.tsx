@@ -30,6 +30,7 @@ import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { useTranslation } from "react-i18next";
+import { safeConfirm as confirm } from "../shared/utils/dialog";
 
 type Item = (Route | FavoriteFolder) & { type: "route" | "folder" };
 
@@ -336,11 +337,19 @@ export default function FavoritesPage() {
             </>
           )}
           <button
-            onClick={() =>
-              item.type === "folder"
-                ? removeFolder(item.id!).then(loadData)
-                : removeRoute(item.id!).then(loadData)
-            }
+            onClick={async () => {
+              const msg = item.type === "folder"
+                ? t("my_routes.delete_folder_confirm", { name: item.name })
+                : t("my_routes.delete_route_confirm", { name: item.name });
+              const confirmed = await confirm(msg, { title: t("my_routes.title"), kind: "warning" });
+              if (confirmed) {
+                if (item.type === "folder") {
+                  removeFolder(item.id!).then(loadData);
+                } else {
+                  removeRoute(item.id!).then(loadData);
+                }
+              }
+            }}
             className="p-1.5 bg-surface-container border border-outline-variant text-error/80 hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
             title={t("my_routes.table.delete_tooltip")}
           >
@@ -442,7 +451,11 @@ export default function FavoritesPage() {
                   </span>
                   <button
                     onClick={async () => {
-                      if (!confirm(t("my_routes.delete_confirm", { count: selectedIds.size }))) return;
+                      const confirmed = await confirm(
+                        t("my_routes.delete_confirm", { count: selectedIds.size }),
+                        { title: t("my_routes.title"), kind: "warning" }
+                      );
+                      if (!confirmed) return;
                       for (const cid of selectedIds) {
                         const [type, id] = cid.split("-");
                         if (type === "folder") await removeFolder(parseInt(id));
