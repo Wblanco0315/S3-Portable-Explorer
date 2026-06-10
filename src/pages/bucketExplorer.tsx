@@ -282,13 +282,12 @@ export default function BucketExplorerPage() {
             const storedToken = localStorage.getItem("aws_sso_token");
             const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
             const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
-            const storedAccountId = localStorage.getItem("aws_sso_account_id");
             const storedRoleName = localStorage.getItem("aws_sso_role_name");
             const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
 
-            if (hasToken && storedAccountId === targetAccountId && storedRoleName) {
-              const { getRoleCredentials } = await import("../features/aws/awsSsoOidc");
-              const creds = await getRoleCredentials(
+            if (hasToken) {
+              const { loginToNativeSsoAccount } = await import("../features/aws/awsSsoOidc");
+              const creds = await loginToNativeSsoAccount(
                 storedToken,
                 targetAccountId,
                 storedRoleName,
@@ -301,6 +300,9 @@ export default function BucketExplorerPage() {
                 targetRegion
               );
               localStorage.setItem("aws_sso_profile", currentRoute.profile);
+              localStorage.setItem("aws_sso_account_id", targetAccountId);
+              localStorage.setItem("aws_sso_account_name", creds.accountName);
+              localStorage.setItem("aws_sso_role_name", creds.roleName);
               localStorage.setItem("aws_auth_method", "sso-native");
             } else {
               throw new Error("Cannot auto-swap profile: native SSO credentials or token missing/expired");

@@ -201,3 +201,76 @@ export const getRoleCredentials = async (
     expiration: creds.expiration,
   };
 };
+
+/**
+ * Resolves a role for a target account using a token, trying to match the stored role name
+ * or fallback to available roles.
+ */
+export const resolveRoleForAccount = async (
+  accessToken: string,
+  accountId: string,
+  ssoRegion: string,
+  preferredRoleName?: string | null
+): Promise<string> => {
+  const roles = await listAwsAccountRoles(accessToken, accountId, ssoRegion);
+  if (roles.length === 0) {
+    throw new Error(`No IAM Identity Center roles available in account ${accountId}`);
+  }
+
+  // 1. Try to find the exact match
+  if (preferredRoleName) {
+    const exactMatch = roles.find(r => r.roleName === preferredRoleName);
+    if (exactMatch?.roleName) return exactMatch.roleName;
+  }
+
+  // 2. Try to find a role with a similar base name (excluding suffixes if we can)
+  // AWSReservedSSO_<PermissionSetName>_<hexSuffix>
+  if (preferredRoleName) {
+    const preferredBase = preferredRoleName.replace(/_[a-f0-9]{16}$/i, "");
+    const baseMatch = roles.find(r => r.roleName && r.roleName.startsWith(preferredBase));
+    if (baseMatch?.roleName) return baseMatch.roleName;
+  }
+
+  // 3. Fall back to the first role in the list
+  if (roles[0].roleName) return roles[0].roleName;
+
+  throw new Error(`Could not find a valid role name in account ${accountId}`);
+};
+
+/**
+ * Automatically resolves the role, retrieves temporary credentials, and retrieves the
+ * display name for the specified target account.
+ */
+export const loginToNativeSsoAccount = async (
+  accessToken: string,
+  accountId: string,
+  preferredRoleName: string | null,
+  ssoRegion: string
+): Promise<SsoCredentialsResponse & {
+  roleName: string;
+  accountName: string;
+}> => {
+  // 1. Resolve role name
+  const roleName = await resolveRoleForAccount(accessToken, accountId, ssoRegion, preferredRoleName);
+
+  // 2. Get role credentials
+  const creds = await getRoleCredentials(accessToken, accountId, roleName, ssoRegion);
+
+  // 3. Fetch accounts to get account name
+  let accountName = accountId;
+  try {
+    const accounts = await listAwsAccounts(accessToken, ssoRegion);
+    const matchedAccount = accounts.find(a => a.accountId === accountId);
+    if (matchedAccount?.accountName) {
+      accountName = matchedAccount.accountName;
+    }
+  } catch (err) {
+    console.warn("Failed to retrieve account name for display:", err);
+  }
+
+  return {
+    ...creds,
+    roleName,
+    accountName
+  };
+};

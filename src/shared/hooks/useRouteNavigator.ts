@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   isAwsAuthenticated,
   getCurrentActiveProfile,
@@ -7,9 +8,13 @@ import {
 } from "../../features/aws/s3Client";
 import { getLocalSSOCredentials } from "../../features/aws/awsCli";
 import { Route, incrementRouteVisit } from "../../features/favorites/favoritesStore";
+import { useLoadingStore } from "./useLoadingStore";
 
 export function useRouteNavigator() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const showLoading = useLoadingStore((state) => state.showLoading);
+  const hideLoading = useLoadingStore((state) => state.hideLoading);
 
   const navigateToRoute = async (route: Route) => {
     if (route.id) {
@@ -40,18 +45,18 @@ export function useRouteNavigator() {
       // 4. Try automatic login for the target profile
       if (isTargetNativeSSO) {
         try {
+          showLoading(t("buckets.switching_sso_account"));
           const storedToken = localStorage.getItem("aws_sso_token");
           const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
           const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
-          const storedAccountId = localStorage.getItem("aws_sso_account_id");
           const storedRoleName = localStorage.getItem("aws_sso_role_name");
           const targetAccountId = targetProfile.replace("sso-native-", "");
           const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
 
-          if (hasToken && storedAccountId === targetAccountId && storedRoleName) {
+          if (hasToken) {
             console.log(`Attempting automatic native SSO login for account: ${targetAccountId}`);
-            const { getRoleCredentials } = await import("../../features/aws/awsSsoOidc");
-            const creds = await getRoleCredentials(
+            const { loginToNativeSsoAccount } = await import("../../features/aws/awsSsoOidc");
+            const creds = await loginToNativeSsoAccount(
               storedToken,
               targetAccountId,
               storedRoleName,
@@ -63,6 +68,14 @@ export function useRouteNavigator() {
               creds.sessionToken,
               targetRegion
             );
+
+            // Save persistent profile configs for the active account
+            localStorage.setItem("aws_sso_profile", targetProfile);
+            localStorage.setItem("aws_sso_account_id", targetAccountId);
+            localStorage.setItem("aws_sso_account_name", creds.accountName);
+            localStorage.setItem("aws_sso_role_name", creds.roleName);
+            localStorage.setItem("aws_auth_method", "sso-native");
+
             sessionStorage.removeItem("redirect_after_login");
             console.log("Automatic native SSO login successful. Redirecting directly to bucket.");
             navigate(targetPath);
@@ -71,10 +84,14 @@ export function useRouteNavigator() {
           }
         } catch (err) {
           console.warn(`Automatic native SSO login failed for '${targetProfile}'. Directing to login screen.`, err);
+          sessionStorage.removeItem("redirect_after_login");
           navigate("/buckets");
+        } finally {
+          hideLoading();
         }
       } else {
         try {
+          showLoading(t("buckets.profile_login", { profile: targetProfile }));
           console.log(`Attempting automatic login for target profile: '${targetProfile}'`);
           const creds = await getLocalSSOCredentials(targetProfile);
           setAwsCredentials(
@@ -89,6 +106,8 @@ export function useRouteNavigator() {
         } catch (err) {
           console.warn(`Automatic login failed for '${targetProfile}' (token probably expired/invalid). Directing to login screen.`, err);
           navigate("/buckets");
+        } finally {
+          hideLoading();
         }
       }
       return;
@@ -102,18 +121,18 @@ export function useRouteNavigator() {
 
       if (isTargetNativeSSO) {
         try {
+          showLoading(t("buckets.auto_sso_login"));
           const storedToken = localStorage.getItem("aws_sso_token");
           const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
           const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
-          const storedAccountId = localStorage.getItem("aws_sso_account_id");
           const storedRoleName = localStorage.getItem("aws_sso_role_name");
           const targetAccountId = targetProfile.replace("sso-native-", "");
           const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
 
-          if (hasToken && storedAccountId === targetAccountId && storedRoleName) {
+          if (hasToken) {
             console.log(`Attempting automatic native SSO login for account: ${targetAccountId}`);
-            const { getRoleCredentials } = await import("../../features/aws/awsSsoOidc");
-            const creds = await getRoleCredentials(
+            const { loginToNativeSsoAccount } = await import("../../features/aws/awsSsoOidc");
+            const creds = await loginToNativeSsoAccount(
               storedToken,
               targetAccountId,
               storedRoleName,
@@ -125,6 +144,14 @@ export function useRouteNavigator() {
               creds.sessionToken,
               targetRegion
             );
+
+            // Save persistent profile configs for the active account
+            localStorage.setItem("aws_sso_profile", targetProfile);
+            localStorage.setItem("aws_sso_account_id", targetAccountId);
+            localStorage.setItem("aws_sso_account_name", creds.accountName);
+            localStorage.setItem("aws_sso_role_name", creds.roleName);
+            localStorage.setItem("aws_auth_method", "sso-native");
+
             sessionStorage.removeItem("redirect_after_login");
             console.log("Automatic native SSO login successful. Redirecting directly to bucket.");
             navigate(targetPath);
@@ -133,10 +160,14 @@ export function useRouteNavigator() {
           }
         } catch (err) {
           console.warn(`Automatic native SSO login failed for '${targetProfile}'. Directing to login screen.`, err);
+          sessionStorage.removeItem("redirect_after_login");
           navigate("/buckets");
+        } finally {
+          hideLoading();
         }
       } else {
         try {
+          showLoading(t("buckets.profile_login", { profile: targetProfile }));
           console.log(`Attempting automatic login for profile: '${targetProfile}'`);
           const creds = await getLocalSSOCredentials(targetProfile);
           setAwsCredentials(
@@ -151,6 +182,8 @@ export function useRouteNavigator() {
         } catch (err) {
           console.warn(`Automatic login failed for '${targetProfile}'. Navigating to login screen.`, err);
           navigate("/buckets");
+        } finally {
+          hideLoading();
         }
       }
       return;

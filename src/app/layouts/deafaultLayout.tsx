@@ -18,6 +18,7 @@ import { HiOutlineSun, HiOutlineMoon } from "react-icons/hi";
 import pkg from "../../../package.json";
 import UpdateNotifier from "../../components/updater/UpdateNotifier";
 import { useTranslation } from "react-i18next";
+import { useLoadingStore } from "../../shared/hooks/useLoadingStore";
 
 export default function DefaultLayout() {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ export default function DefaultLayout() {
   const { theme, toggleTheme } = useTheme();
   const { tasks } = useDownloadStore();
   const activeDownloadsCount = tasks.filter(t => t.status === 'downloading' || t.status === 'queued').length;
+  const { isLoading, message } = useLoadingStore();
 
   const [folders, setFolders] = useState<FavoriteFolder[]>([]);
 
@@ -132,6 +134,26 @@ export default function DefaultLayout() {
           </div>
         </main>
       </div>
+
+      {/* Global loading overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-xs transition-all duration-300">
+          <div className="bg-surface-container border border-outline-variant p-8 rounded-lg flex flex-col items-center gap-4 max-w-xs w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="relative w-12 h-12">
+              <div className="absolute inset-0 rounded-full border-3 border-primary/20 animate-pulse"></div>
+              <div className="absolute inset-0 rounded-full border-3 border-transparent border-t-primary border-r-primary animate-spin"></div>
+            </div>
+            <div className="flex flex-col items-center gap-1 mt-2">
+              <span className="text-on-surface font-bold text-center text-body-md tracking-tight">
+                {message || t("buckets.steps.loading_creds")}
+              </span>
+              <span className="text-primary font-semibold font-mono text-label-sm uppercase tracking-widest mt-0.5 animate-pulse">
+                {t("buckets.handshake_sts_status")}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

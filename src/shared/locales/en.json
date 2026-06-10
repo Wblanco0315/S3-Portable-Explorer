@@ -154,6 +154,9 @@
     "sso_logged_in_msg": "SSO session started. Connecting...",
     "handshake_sts_status": "Restoring AWS role credentials...",
     "fetching_sso_accounts_status": "Fetching enabled AWS accounts...",
+    "switching_sso_account": "Switching SSO account...",
+    "auto_sso_login": "Starting automatic SSO login...",
+    "profile_login": "Logging into profile '{{profile}}'...",
     "steps": {
       "select_method": "Select connection method",
       "configure_access": "Configure access credentials",
