@@ -6,7 +6,9 @@
     "downloads": "Downloads",
     "my_routes": "My Routes",
     "other": "Other",
-    "settings": "Settings"
+    "settings": "Settings",
+    "go_to_s3_url_placeholder": "Go to S3 URL (e.g. s3://bucket/prefix)",
+    "go_btn": "Go"
   },
   "dashboard": {
     "welcome": "Welcome Back",
@@ -173,7 +175,8 @@
       "back": "Back",
       "cancel": "Cancel",
       "connect": "Connect",
-      "next": "Next"
+      "next": "Next",
+      "confirm": "Confirm"
     },
     "explorer": {
       "name_col": "Name",
@@ -272,6 +275,7 @@
     "delete_confirm": "Delete {{count}} items?",
     "delete_folder_confirm": "Are you sure you want to delete the folder '{{name}}' and all its contents?",
     "delete_route_confirm": "Are you sure you want to delete the route '{{name}}'?",
+    "go_to_s3_btn": "Go to S3 Path",
     "table": {
       "name_col": "Name",
       "type_col": "Type",

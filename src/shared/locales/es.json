@@ -6,7 +6,9 @@
     "downloads": "Descargas",
     "my_routes": "Mis Rutas",
     "other": "Otros",
-    "settings": "Configuración"
+    "settings": "Configuración",
+    "go_to_s3_url_placeholder": "Ir a URL S3 (ej. s3://bucket/prefijo)",
+    "go_btn": "Ir"
   },
   "dashboard": {
     "welcome": "Bienvenido de Nuevo",
@@ -173,7 +175,8 @@
       "back": "Atrás",
       "cancel": "Cancelar",
       "connect": "Conectar",
-      "next": "Siguiente"
+      "next": "Siguiente",
+      "confirm": "Aceptar"
     },
     "explorer": {
       "name_col": "Nombre",
@@ -272,6 +275,7 @@
     "delete_confirm": "¿Eliminar {{count}} ítems?",
     "delete_folder_confirm": "¿Estás seguro de que deseas eliminar la carpeta '{{name}}' y todo su contenido?",
     "delete_route_confirm": "¿Estás seguro de que deseas eliminar la ruta '{{name}}'?",
+    "go_to_s3_btn": "Ir a Ruta S3",
     "table": {
       "name_col": "Nombre",
       "type_col": "Tipo",

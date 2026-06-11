@@ -30,6 +30,39 @@ export default function BucketPage() {
   const { getSetting, saveSetting, logAction } = useDatabase();
   const { t } = useTranslation();
 
+  const [s3UrlInput, setS3UrlInput] = useState("");
+
+  const handleGoToS3Url = (url: string) => {
+    let cleanUrl = url.trim();
+    if (!cleanUrl) return;
+
+    if (cleanUrl.toLowerCase().startsWith("s3://")) {
+      cleanUrl = cleanUrl.slice(5);
+    }
+
+    const slashIndex = cleanUrl.indexOf("/");
+    let bucket = "";
+    let prefix = "";
+
+    if (slashIndex === -1) {
+      bucket = cleanUrl;
+    } else {
+      bucket = cleanUrl.slice(0, slashIndex);
+      prefix = cleanUrl.slice(slashIndex + 1);
+    }
+
+    if (bucket) {
+      try {
+        bucket = decodeURIComponent(bucket);
+        prefix = decodeURIComponent(prefix);
+      } catch (e) {
+        // Fallback to original
+      }
+      navigate(`/buckets/${bucket}?prefix=${encodeURIComponent(prefix)}`);
+      setS3UrlInput("");
+    }
+  };
+
   // Basic States
   const [isAuthenticated, setIsAuthenticated] = useState(isAwsAuthenticated());
   const [buckets, setBuckets] = useState<any[]>([]);
@@ -1436,22 +1469,55 @@ export default function BucketPage() {
         <div className="bg-surface-container border border-outline-variant rounded-lg flex flex-col flex-1 min-h-0 overflow-hidden">
 
           {/* Toolbar */}
-          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex items-center justify-between gap-4 shrink-0">
-            <div className="relative w-full max-w-md">
-              <HiOutlineSearch
-                className="absolute left-3 top-3 text-on-surface-variant"
-                size={16}
-              />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={t("buckets.search_placeholder")}
-                className="w-full pl-9 pr-4 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
-                aria-label={t("buckets.search_placeholder")}
-              />
+          <div className="px-4 py-3 bg-surface-container-low border-b border-outline-variant flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 flex-1">
+              {/* Filter Buckets Input */}
+              <div className="relative w-full max-w-sm">
+                <HiOutlineSearch
+                  className="absolute left-3 top-3 text-on-surface-variant"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={t("buckets.search_placeholder")}
+                  className="w-full pl-9 pr-4 py-2 bg-surface border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
+                  aria-label={t("buckets.search_placeholder")}
+                />
+              </div>
+
+              {/* Navigate to S3 URL Input */}
+              <div className="relative w-full max-w-md">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleGoToS3Url(s3UrlInput);
+                  }}
+                  className="relative flex items-center w-full"
+                >
+                  <span className="absolute left-3 text-on-surface-variant flex items-center">
+                    <HiOutlineDatabase size={16} />
+                  </span>
+                  <input
+                    type="text"
+                    value={s3UrlInput}
+                    onChange={(e) => setS3UrlInput(e.target.value)}
+                    placeholder={t("menu.go_to_s3_url_placeholder")}
+                    className="w-full pl-10 pr-16 py-2 bg-surface border border-outline-variant rounded focus:border-primary focus:outline-none transition-all text-body-md text-on-surface font-mono"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!s3UrlInput.trim()}
+                    className="absolute right-1 top-1 bottom-1 px-3 bg-secondary-container hover:bg-surface-bright text-on-secondary-container text-label-sm font-semibold rounded border border-outline-variant hover:border-primary transition-all cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {t("menu.go_btn")}
+                  </button>
+                </form>
+              </div>
             </div>
-            <div className="text-label-sm font-medium text-on-surface-variant font-mono uppercase tracking-wider">
+
+            <div className="text-label-sm font-medium text-on-surface-variant font-mono uppercase tracking-wider shrink-0">
               {currentBuckets.length} / {buckets.length} {t("buckets.title")}
             </div>
           </div>

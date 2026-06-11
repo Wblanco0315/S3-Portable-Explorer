@@ -12,6 +12,7 @@ import {
   HiOutlineExternalLink,
   HiOutlineDownload,
   HiOutlineUpload,
+  HiOutlineDatabase,
 } from "react-icons/hi";
 import {
   listRoutes,
@@ -444,6 +445,33 @@ export default function FavoritesPage() {
                   className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary transition-all outline-none text-body-md text-on-surface"
                 />
               </div>
+              {searchTerm.trim().toLowerCase().startsWith("s3://") && (
+                <button
+                  onClick={() => {
+                    let cleanUrl = searchTerm.trim().slice(5);
+                    const slashIndex = cleanUrl.indexOf("/");
+                    let bucket = "";
+                    let prefix = "";
+                    if (slashIndex === -1) {
+                      bucket = cleanUrl;
+                    } else {
+                      bucket = cleanUrl.slice(0, slashIndex);
+                      prefix = cleanUrl.slice(slashIndex + 1);
+                    }
+                    if (bucket) {
+                      try {
+                        bucket = decodeURIComponent(bucket);
+                        prefix = decodeURIComponent(prefix);
+                      } catch (e) {}
+                      navigate(`/buckets/${bucket}?prefix=${encodeURIComponent(prefix)}`);
+                      setSearchTerm("");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary/20 transition-all uppercase tracking-wider cursor-pointer animate-in slide-in-from-left-2"
+                >
+                  <HiOutlineDatabase size={14} /> {t("my_routes.go_to_s3_btn")}
+                </button>
+              )}
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
                   <span className="text-label-sm font-semibold text-primary bg-primary-container/20 px-2 py-0.5 rounded-sm border border-primary-container/30 uppercase">

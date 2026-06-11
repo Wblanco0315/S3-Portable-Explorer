@@ -17,6 +17,7 @@ import { useTheme } from "../ThemeContext";
 import { HiOutlineSun, HiOutlineMoon } from "react-icons/hi";
 import pkg from "../../../package.json";
 import UpdateNotifier from "../../components/updater/UpdateNotifier";
+import { ConfirmModal } from "../../components/ConfirmModal";
 import { useTranslation } from "react-i18next";
 import { useLoadingStore } from "../../shared/hooks/useLoadingStore";
 
@@ -29,6 +30,7 @@ export default function DefaultLayout() {
   const { isLoading, message } = useLoadingStore();
 
   const [folders, setFolders] = useState<FavoriteFolder[]>([]);
+
 
   useEffect(() => {
     listFolders().then(setFolders);
@@ -154,6 +156,7 @@ export default function DefaultLayout() {
           </div>
         </div>
       )}
+      <ConfirmModal />
     </div>
   );
 }
