@@ -8,9 +8,11 @@ import {
   HiOutlineX as IconX,
   HiOutlineInformationCircle as IconInfo
 } from "react-icons/hi";
+import { useTranslation } from "react-i18next";
 import pkg from "../../../package.json";
 
 export default function UpdateNotifier() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [status, setStatus] = useState<"idle" | "checking" | "downloading" | "error" | "done">("idle");
@@ -23,8 +25,7 @@ export default function UpdateNotifier() {
   const checkForUpdates = async (manual = false) => {
     if (manual) {
       setStatus("checking");
-      // Show toast that we are checking
-      setMessageToast({ text: "Checking for updates...", type: "info" });
+      setMessageToast({ text: t("updater.checking"), type: "info" });
     }
 
     try {
@@ -38,7 +39,7 @@ export default function UpdateNotifier() {
       } else {
         setStatus("idle");
         if (manual) {
-          setMessageToast({ text: "Your application is up to date!", type: "success" });
+          setMessageToast({ text: t("updater.up_to_date_toast"), type: "success" });
           setTimeout(() => setMessageToast(null), 4000);
         }
       }
@@ -47,7 +48,7 @@ export default function UpdateNotifier() {
       setStatus("error");
       setErrorMsg(err.message || String(err));
       if (manual) {
-        setMessageToast({ text: "Failed to check for updates.", type: "error" });
+        setMessageToast({ text: t("updater.failed_check"), type: "error" });
         setTimeout(() => setMessageToast(null), 4000);
       }
     }
@@ -105,7 +106,7 @@ export default function UpdateNotifier() {
       });
 
       setStatus("done");
-      setMessageToast({ text: "Update installed successfully! Restarting...", type: "success" });
+      setMessageToast({ text: t("updater.success_installed"), type: "success" });
       
       // Small pause to let user see success, then relaunch
       setTimeout(async () => {
@@ -123,8 +124,22 @@ export default function UpdateNotifier() {
     } catch (err: any) {
       console.error("Installation failed:", err);
       setStatus("error");
-      setErrorMsg(err.message || String(err));
-      setMessageToast({ text: "Update installation failed.", type: "error" });
+      
+      const rawError = err.message || String(err);
+      let friendlyError = rawError;
+      
+      // Check for common permission issues on Windows
+      if (
+        rawError.toLowerCase().includes("access") || 
+        rawError.toLowerCase().includes("permission") || 
+        rawError.toLowerCase().includes("denied") ||
+        rawError.toLowerCase().includes("privilege")
+      ) {
+        friendlyError = t("updater.permission_error_desc");
+      }
+      
+      setErrorMsg(friendlyError);
+      setMessageToast({ text: t("updater.install_failed"), type: "error" });
     }
   };
 
@@ -180,8 +195,8 @@ export default function UpdateNotifier() {
                   <IconDownload className="w-6 h-6 animate-bounce" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-slate-50">Update Available</h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400">A new version is ready to install</p>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-slate-50">{t("updater.title")}</h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400">{t("updater.subtitle")}</p>
                 </div>
               </div>
               {status !== "downloading" && status !== "done" && (
@@ -199,12 +214,12 @@ export default function UpdateNotifier() {
               {/* Version Comparison */}
               <div className="flex items-center justify-around bg-gray-50/50 dark:bg-slate-950/30 border border-gray-100 dark:border-slate-800/40 rounded-xl p-3">
                 <div className="text-center">
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">Current</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{t("updater.current_version")}</p>
                   <p className="text-sm font-black text-gray-600 dark:text-slate-400">v{pkg.version}</p>
                 </div>
                 <div className="w-8 h-px bg-gray-200 dark:bg-slate-800" />
                 <div className="text-center">
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-indigo-500">Available</p>
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-indigo-500">{t("updater.available_version")}</p>
                   <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">v{updateInfo?.version}</p>
                 </div>
               </div>
@@ -213,7 +228,7 @@ export default function UpdateNotifier() {
               {updateInfo?.body && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
-                    <IconInfo className="w-4 h-4" /> Release Notes:
+                    <IconInfo className="w-4 h-4" /> {t("updater.release_notes")}
                   </p>
                   <div className="max-h-36 overflow-y-auto bg-gray-50/50 dark:bg-slate-950/50 border border-gray-100 dark:border-slate-800/60 rounded-xl p-3.5 text-xs text-gray-600 dark:text-slate-300 font-sans leading-relaxed shadow-inner">
                     {updateInfo.body}
@@ -231,7 +246,7 @@ export default function UpdateNotifier() {
                     />
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 dark:text-slate-400">
-                    <span className="animate-pulse">Downloading packages...</span>
+                    <span className="animate-pulse">{t("updater.downloading")}</span>
                     <span>{progress}% {totalBytes > 0 && `(${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)})`}</span>
                   </div>
                 </div>
@@ -240,13 +255,13 @@ export default function UpdateNotifier() {
               {status === "done" && (
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm pt-2 animate-in fade-in-0 duration-300 justify-center">
                   <IconCheck className="w-5 h-5 animate-bounce" />
-                  <span>Update complete! Restarting...</span>
+                  <span>{t("updater.complete")}</span>
                 </div>
               )}
 
               {status === "error" && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 text-xs text-red-600 dark:text-red-400 font-medium">
-                  <p className="font-bold flex items-center gap-1"><IconInfo className="w-4 h-4" /> Installation Error</p>
+                  <p className="font-bold flex items-center gap-1"><IconInfo className="w-4 h-4" /> {t("updater.error_title")}</p>
                   <p className="mt-1 opacity-90">{errorMsg}</p>
                 </div>
               )}
@@ -259,14 +274,14 @@ export default function UpdateNotifier() {
                   onClick={() => setIsOpen(false)}
                   className="px-4 py-2 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-350 hover:bg-gray-50 dark:hover:bg-slate-800 text-sm font-semibold rounded-lg transition-colors cursor-pointer"
                 >
-                  Later
+                  {t("updater.later_btn")}
                 </button>
                 <button
                   onClick={handleDownloadAndInstall}
                   className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow-indigo-500/10 hover:shadow-lg transition-all cursor-pointer"
                 >
                   <IconDownload className="w-4 h-4" />
-                  Update Now
+                  {t("updater.update_btn")}
                 </button>
               </div>
             )}

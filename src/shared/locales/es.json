@@ -298,5 +298,23 @@
     "not_found_title": "404 - Página No Encontrada",
     "not_found_desc": "La página que buscas no existe o ha sido movida.",
     "copied": "¡Copiado!"
+  },
+  "updater": {
+    "title": "Actualización Disponible",
+    "subtitle": "Una nueva versión está lista para instalar",
+    "current_version": "Actual",
+    "available_version": "Disponible",
+    "release_notes": "Notas de Lanzamiento:",
+    "downloading": "Descargando paquetes...",
+    "complete": "¡Actualización completada! Reiniciando...",
+    "error_title": "Error de Instalación",
+    "later_btn": "Más tarde",
+    "update_btn": "Actualizar Ahora",
+    "checking": "Buscando actualizaciones...",
+    "up_to_date_toast": "¡Tu aplicación está al día!",
+    "failed_check": "Fallo al comprobar actualizaciones.",
+    "success_installed": "¡Actualización instalada con éxito! Reiniciando...",
+    "install_failed": "Fallo en la instalación de la actualización.",
+    "permission_error_desc": "Permiso denegado. Si la aplicación está instalada en Program Files o en un directorio de sólo lectura, es posible que debas ejecutarla como Administrador o mover/reinstalar la aplicación."
   }
 }
