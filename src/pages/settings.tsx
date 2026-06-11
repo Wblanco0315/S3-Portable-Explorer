@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { safeConfirm as confirm } from "../shared/utils/dialog";
 import { useDatabase } from "../shared/hooks/useDatabase";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { isAwsAuthenticated, clearAwsCredentials } from "../features/aws/s3Client";
@@ -10,16 +11,21 @@ import {
   HiOutlineRefresh, 
   HiOutlineCheckCircle, 
   HiOutlineDocumentText, 
-  HiOutlineArrowRight 
+  HiOutlineArrowRight,
+  HiOutlineAdjustments
 } from "react-icons/hi";
 import pkg from "../../package.json";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "../app/ThemeContext";
 
 export default function SettingsPage() {
+  const { t, i18n } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const [downloadDir, setDownloadDir] = useState<string>("~/Downloads/s3-explorer");
   const [validateChecksums, setValidateChecksums] = useState<boolean>(true);
   const [ssoStartUrl, setSsoStartUrl] = useState<string>("");
   const [ssoRegion, setSsoRegion] = useState<string>("us-east-1");
-  const [activeProfile, setActiveProfile] = useState<string>("Ninguno");
+  const [activeProfile, setActiveProfile] = useState<string>("");
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [releaseChannel, setReleaseChannel] = useState<string>("Estable");
 
@@ -68,7 +74,7 @@ export default function SettingsPage() {
     });
 
     // Determine initial connection state & active profile
-    const profileName = localStorage.getItem("aws_sso_role_name") || localStorage.getItem("aws_sso_profile") || "Ninguno";
+    const profileName = localStorage.getItem("aws_sso_role_name") || localStorage.getItem("aws_sso_profile") || "";
     setActiveProfile(profileName);
     setIsConnected(isAwsAuthenticated());
   }, []);
@@ -104,12 +110,19 @@ export default function SettingsPage() {
     await saveSetting("sso_region", ssoRegion.trim() || "us-east-1");
     setTimeout(() => {
       setIsSavingSso(false);
-      setSsoFeedback("Configuración de SSO guardada");
+      setSsoFeedback("settings.sso_saved_feedback");
       setTimeout(() => setSsoFeedback(null), 3000);
     }, 1000);
   };
 
   const handleUnlink = async () => {
+    const confirmed = await confirm(
+      t("settings.unlink_confirm"),
+      { title: t("settings.title"), kind: "warning" }
+    );
+    if (!confirmed) {
+      return;
+    }
     clearAwsCredentials();
     localStorage.removeItem("aws_sso_profile");
     localStorage.removeItem("aws_sso_account_id");
@@ -122,19 +135,19 @@ export default function SettingsPage() {
 
     setSsoStartUrl("");
     setSsoRegion("us-east-1");
-    setActiveProfile("Ninguno");
+    setActiveProfile("");
     setIsConnected(false);
 
     await saveSetting("sso_start_url", "");
     await saveSetting("sso_region", "us-east-1");
 
-    setSsoFeedback("Conexión desvinculada exitosamente");
+    setSsoFeedback("settings.unlink_feedback");
     setTimeout(() => setSsoFeedback(null), 3000);
   };
 
   const handleSyncProfiles = async () => {
     setIsSyncingProfile(true);
-    const profileName = localStorage.getItem("aws_sso_role_name") || localStorage.getItem("aws_sso_profile") || "Ninguno";
+    const profileName = localStorage.getItem("aws_sso_role_name") || localStorage.getItem("aws_sso_profile") || "";
     setActiveProfile(profileName);
     setIsConnected(isAwsAuthenticated());
     setTimeout(() => setIsSyncingProfile(false), 1000);
@@ -163,8 +176,8 @@ export default function SettingsPage() {
   return (
     <div className="h-full overflow-y-auto p-margin max-w-5xl mx-auto w-full animate-in fade-in duration-500 text-on-surface">
       <div className="mb-margin">
-        <h2 className="font-headline-lg text-headline-lg text-on-surface mb-unit">Configuración</h2>
-        <p className="font-body-lg text-body-lg text-on-surface-variant">Gestiona las preferencias locales y conexiones de AWS.</p>
+        <h2 className="font-headline-lg text-headline-lg text-on-surface mb-unit">{t("settings.title")}</h2>
+        <p className="font-body-lg text-body-lg text-on-surface-variant">{t("settings.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-margin">
@@ -176,14 +189,14 @@ export default function SettingsPage() {
             <div className="bg-surface-variant px-margin py-3 border-b border-outline-variant">
               <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
                 <HiOutlineFolder className="w-6 h-6 text-on-surface" />
-                Preferencias de Entorno
+                {t("settings.env_preferences")}
               </h3>
             </div>
             
             <div className="p-margin space-y-gutter">
               <div className="flex flex-col gap-2">
                 <label className="font-label-md text-label-md text-on-surface-variant" htmlFor="download_dir">
-                  Directorio de Descarga Principal
+                  {t("settings.download_dir_label")}
                 </label>
                 <div className="flex gap-2">
                   <input 
@@ -197,19 +210,19 @@ export default function SettingsPage() {
                     onClick={handleSelectFolder}
                     className="bg-secondary-container hover:bg-surface-bright text-on-secondary-container px-4 py-2 rounded font-label-md text-label-md border border-outline-variant transition-colors whitespace-nowrap cursor-pointer"
                   >
-                    {isSavingDir ? "Guardando..." : "Explorar..."}
+                    {isSavingDir ? t("settings.saving_btn") : t("settings.browse_btn")}
                   </button>
                 </div>
                 <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 opacity-75">
-                  Los archivos descargados desde los buckets se guardarán aquí por defecto.
+                  {t("settings.download_dir_desc")}
                 </p>
               </div>
 
               <div className="border-t border-outline-variant pt-gutter flex items-center justify-between">
                 <div>
-                  <h4 className="font-body-md text-body-md text-on-surface">Validación de Checksums</h4>
+                  <h4 className="font-body-md text-body-md text-on-surface">{t("settings.validate_checksums")}</h4>
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
-                    Verificar la integridad de los archivos tras la descarga (MD5/SHA256).
+                    {t("settings.validate_checksums_desc")}
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -225,22 +238,73 @@ export default function SettingsPage() {
 
               <div className="border-t border-outline-variant pt-gutter flex items-center justify-between">
                 <div>
-                  <h4 className="font-body-md text-body-md text-on-surface">Descargas Concurrentes</h4>
+                  <h4 className="font-body-md text-body-md text-on-surface">{t("settings.concurrent_downloads")}</h4>
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
-                    Permitir transferencias múltiples para optimizar el ancho de banda.
+                    {t("settings.concurrent_downloads_desc")}
                   </p>
                 </div>
                 <select 
-                  value={`${maxConcurrentDownloads} hilos`}
+                  value={`${maxConcurrentDownloads} ${t("settings.threads")}`}
                   onChange={(e) => {
                     const val = parseInt(e.target.value.split(" ")[0], 10);
                     if (!isNaN(val)) handleConcurrentChange(val);
                   }}
                   className="bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors w-24 cursor-pointer"
                 >
-                  <option>4 hilos</option>
-                  <option>8 hilos</option>
-                  <option>16 hilos</option>
+                  <option>{`4 ${t("settings.threads")}`}</option>
+                  <option>{`8 ${t("settings.threads")}`}</option>
+                  <option>{`16 ${t("settings.threads")}`}</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {/* System Settings Section */}
+          <section className="bg-surface-container border border-outline-variant rounded-lg overflow-hidden">
+            <div className="bg-surface-variant px-margin py-3 border-b border-outline-variant">
+              <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+                <HiOutlineAdjustments className="w-6 h-6 text-on-surface" />
+                {t("settings.system_settings")}
+              </h3>
+            </div>
+            
+            <div className="p-margin space-y-gutter">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-body-md text-body-md text-on-surface">{t("settings.language_label")}</h4>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                    {t("settings.language_desc")}
+                  </p>
+                </div>
+                <select 
+                  value={i18n.language?.startsWith("es") ? "es" : "en"}
+                  onChange={(e) => i18n.changeLanguage(e.target.value)}
+                  className="bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors w-32 cursor-pointer"
+                >
+                  <option value="en">{t("settings.languages.en")}</option>
+                  <option value="es">{t("settings.languages.es")}</option>
+                </select>
+              </div>
+
+              <div className="border-t border-outline-variant pt-gutter flex items-center justify-between">
+                <div>
+                  <h4 className="font-body-md text-body-md text-on-surface">{t("settings.theme_label")}</h4>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                    {t("settings.theme_desc")}
+                  </p>
+                </div>
+                <select 
+                  value={theme}
+                  onChange={(e) => {
+                    const selected = e.target.value as "light" | "dark";
+                    if (selected !== theme) {
+                      toggleTheme();
+                    }
+                  }}
+                  className="bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors w-32 cursor-pointer"
+                >
+                  <option value="light">{t("settings.themes.light")}</option>
+                  <option value="dark">{t("settings.themes.dark")}</option>
                 </select>
               </div>
             </div>
@@ -251,20 +315,20 @@ export default function SettingsPage() {
             <div className="bg-surface-variant px-margin py-3 border-b border-outline-variant flex justify-between items-center">
               <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
                 <HiOutlineKey className="w-6 h-6 text-on-surface" />
-                Configuración AWS SSO
+                {t("settings.aws_sso_config")}
               </h3>
               <span className={`border text-label-sm font-label-sm px-2 py-1 rounded flex items-center gap-1 bg-surface border-outline-variant ${
                 isConnected ? "text-primary" : "text-on-surface-variant opacity-75"
               }`}>
                 <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-primary animate-pulse" : "bg-outline"}`}></span>
-                {isConnected ? "Conectado" : "Desconectado"}
+                {isConnected ? t("settings.connected") : t("settings.disconnected")}
               </span>
             </div>
 
             <form onSubmit={handleSaveSsoSettings} className="p-margin space-y-gutter">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
                 <div className="flex flex-col gap-2">
-                  <label className="font-label-md text-label-md text-on-surface-variant">SSO Start URL</label>
+                  <label className="font-label-md text-label-md text-on-surface-variant">{t("settings.sso_start_url")}</label>
                   <input 
                     type="url"
                     value={ssoStartUrl}
@@ -274,7 +338,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="font-label-md text-label-md text-on-surface-variant">Región SSO</label>
+                  <label className="font-label-md text-label-md text-on-surface-variant">{t("settings.sso_region")}</label>
                   <select 
                     value={ssoRegion}
                     onChange={(e) => setSsoRegion(e.target.value)}
@@ -289,19 +353,19 @@ export default function SettingsPage() {
               </div>
 
               <div className="flex flex-col gap-2 mt-4">
-                <label className="font-label-md text-label-md text-on-surface-variant">Perfil Activo (Profile)</label>
+                <label className="font-label-md text-label-md text-on-surface-variant">{t("settings.active_profile")}</label>
                 <div className="flex gap-2">
                   <input 
                     className="flex-1 bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors" 
                     readOnly 
                     type="text" 
-                    value={activeProfile}
+                    value={activeProfile || t("settings.ninguno")}
                   />
                   <button 
                     type="button"
                     onClick={handleSyncProfiles}
                     className="bg-surface hover:bg-surface-bright text-on-surface px-3 py-2 rounded font-label-md text-label-md border border-outline-variant transition-colors cursor-pointer flex items-center justify-center" 
-                    title="Sincronizar perfiles"
+                    title={t("settings.sync_profiles_title")}
                   >
                     <HiOutlineRefresh className={`text-[18px] ${isSyncingProfile ? "animate-spin" : ""}`} />
                   </button>
@@ -310,7 +374,7 @@ export default function SettingsPage() {
 
               {ssoFeedback && (
                 <p className="font-label-sm text-label-sm text-primary animate-in fade-in duration-300">
-                  {ssoFeedback}
+                  {t(ssoFeedback)}
                 </p>
               )}
 
@@ -320,13 +384,13 @@ export default function SettingsPage() {
                   onClick={handleUnlink}
                   className="bg-surface hover:bg-surface-bright text-on-surface px-4 py-2 rounded font-label-md text-label-md border border-outline-variant transition-colors cursor-pointer"
                 >
-                  Desvincular
+                  {t("settings.unlink_btn")}
                 </button>
                 <button 
                   type="submit"
                   className="bg-primary hover:bg-primary-container text-on-primary px-4 py-2 rounded font-label-md text-label-md border border-transparent transition-colors cursor-pointer"
                 >
-                  {isSavingSso ? "Guardando..." : "Guardar Cambios"}
+                  {isSavingSso ? t("settings.saving_changes_btn") : t("settings.save_changes_btn")}
                 </button>
               </div>
             </form>
@@ -341,7 +405,7 @@ export default function SettingsPage() {
             <div className="bg-surface-variant px-margin py-3 border-b border-outline-variant">
               <h3 className="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
                 <HiOutlineRefresh className="w-6 h-6 text-on-surface" />
-                Actualizaciones
+                {t("settings.updates")}
               </h3>
             </div>
             <div className="p-margin flex flex-col items-center text-center">
@@ -350,25 +414,25 @@ export default function SettingsPage() {
               </div>
               <h4 className="font-body-lg text-body-lg text-on-surface font-semibold mb-1">S3 Explorer v{pkg.version}</h4>
               <p className="font-label-sm text-label-sm text-on-surface-variant mb-4">
-                {isCheckingForUpdates ? "Buscando actualizaciones..." : "El sistema está al día. Última comprobación hace poco."}
+                {isCheckingForUpdates ? t("settings.checking_updates") : t("settings.up_to_date")}
               </p>
               <button 
                 onClick={handleCheckForUpdates}
                 disabled={isCheckingForUpdates}
                 className="w-full bg-surface hover:bg-surface-bright text-on-surface px-4 py-2 rounded font-label-md text-label-md border border-outline-variant transition-colors cursor-pointer disabled:opacity-50"
               >
-                Buscar Actualizaciones
+                {t("settings.check_updates_btn")}
               </button>
             </div>
             <div className="px-margin py-3 bg-surface-container-low border-t border-outline-variant flex justify-between items-center">
-              <span className="font-label-sm text-label-sm text-on-surface-variant">Canal de release</span>
+              <span className="font-label-sm text-label-sm text-on-surface-variant">{t("settings.release_channel")}</span>
               <select 
                 value={releaseChannel}
                 onChange={(e) => handleReleaseChannelChange(e.target.value)}
                 className="bg-transparent border-none text-on-surface font-label-sm text-label-sm focus:ring-0 py-0 pr-6 cursor-pointer"
               >
-                <option value="Estable">Estable</option>
-                <option value="Beta">Beta</option>
+                <option value="Estable">{t("settings.stable")}</option>
+                <option value="Beta">{t("settings.beta")}</option>
               </select>
             </div>
           </section>
@@ -380,17 +444,17 @@ export default function SettingsPage() {
             <div className="relative z-10">
               <h4 className="font-body-md text-body-md text-on-surface font-semibold mb-2 flex items-center gap-2">
                 <HiOutlineDocumentText className="w-[18px] h-[18px] text-on-surface" />
-                Documentación y Soporte
+                {t("settings.doc_support")}
               </h4>
               <p className="font-label-sm text-label-sm text-on-surface-variant mb-4">
-                Consulta la guía técnica para configuraciones avanzadas de IAM y políticas de bucket.
+                {t("settings.doc_desc")}
               </p>
               <a 
                 onClick={handleOpenDoc}
                 className="inline-flex items-center gap-1 font-label-md text-label-md text-primary hover:text-primary-container transition-colors cursor-pointer" 
                 href="#"
               >
-                Ver Documentación 
+                {t("settings.view_doc")}
                 <HiOutlineArrowRight className="w-[16px] h-[16px]" />
               </a>
             </div>

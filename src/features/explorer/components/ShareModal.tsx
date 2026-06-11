@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { HiOutlineClipboardCopy, HiOutlineCheck, HiOutlineExternalLink } from 'react-icons/hi';
 import { S3Object } from '../types';
+import { useTranslation } from 'react-i18next';
 
 interface ShareModalProps {
     isOpen: boolean;
@@ -15,6 +16,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     object, 
     onGenerate 
 }) => {
+    const { t } = useTranslation();
     const [expiresIn, setExpiresIn] = useState(3600); // 1 hour default
     const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -29,7 +31,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             setGeneratedUrl(url);
         } catch (err) {
             console.error("Failed to generate URL", err);
-            alert("Error generating link");
+            alert(t("buckets.share_modal.error_msg"));
         } finally {
             setIsGenerating(false);
         }
@@ -43,16 +45,16 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     };
 
     const expirationOptions = [
-        { label: '1 Hour', value: 3600 },
-        { label: '1 Day', value: 86400 },
-        { label: '7 Days', value: 604800 },
+        { label: t("buckets.share_modal.periods.1_hour"), value: 3600 },
+        { label: t("buckets.share_modal.periods.1_day"), value: 86400 },
+        { label: t("buckets.share_modal.periods.7_days"), value: 604800 },
     ];
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-xs">
             <div className="bg-surface-container border border-outline-variant rounded-lg shadow-2xl max-w-lg w-full overflow-hidden animate-in zoom-in-95 duration-200 text-on-surface">
                 <div className="bg-surface-variant px-margin py-3 border-b border-outline-variant flex justify-between items-center">
-                    <h3 className="font-headline-md text-headline-md text-on-surface">Share Object</h3>
+                    <h3 className="font-headline-md text-headline-md text-on-surface">{t("buckets.share_modal.title")}</h3>
                     <button 
                         onClick={onClose} 
                         className="text-on-surface-variant hover:text-on-surface p-1 rounded hover:bg-surface-container-highest/50 transition-colors cursor-pointer"
@@ -65,7 +67,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
                 <div className="p-margin space-y-gutter">
                     <div className="flex flex-col gap-2">
-                        <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Object</label>
+                        <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">{t("buckets.share_modal.object_label")}</label>
                         <p className="text-body-md font-mono text-on-surface break-all bg-surface border border-outline-variant p-3 rounded font-medium select-all">
                             {object.name}
                         </p>
@@ -74,7 +76,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     {!generatedUrl ? (
                         <div className="space-y-gutter">
                             <div className="flex flex-col gap-2">
-                                <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Link Expiration</label>
+                                <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">{t("buckets.share_modal.expiration_label")}</label>
                                 <div className="grid grid-cols-3 gap-2">
                                     {expirationOptions.map((opt) => (
                                         <button
@@ -102,22 +104,22 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                                 ) : (
                                     <HiOutlineExternalLink className="w-5 h-5" />
                                 )}
-                                Generate Shared Link
+                                {t("buckets.share_modal.generate_btn")}
                             </button>
                         </div>
                     ) : (
                         <div className="space-y-gutter animate-in fade-in slide-in-from-bottom-2">
                             <div className="p-3 bg-surface-container border border-primary/20 rounded text-on-surface text-body-md">
                                 <p className="font-bold text-primary mb-1 flex items-center gap-2">
-                                    <HiOutlineCheck className="w-4 h-4" /> Link Generated Successfully
+                                    <HiOutlineCheck className="w-4 h-4" /> {t("buckets.share_modal.success_title")}
                                 </p>
                                 <p className="text-label-sm font-mono text-on-surface-variant">
-                                    This link will be valid for {expirationOptions.find(o => o.value === expiresIn)?.label}.
+                                    {t("buckets.share_modal.success_desc", { period: expirationOptions.find(o => o.value === expiresIn)?.label })}
                                 </p>
                             </div>
 
                             <div className="flex flex-col gap-2">
-                                <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Shared URL</label>
+                                <label className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">{t("buckets.share_modal.shared_url_label")}</label>
                                 <div className="flex gap-2">
                                     <input 
                                         readOnly
@@ -134,7 +136,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                                         }`}
                                     >
                                         {copied ? <HiOutlineCheck className="w-4 h-4" /> : <HiOutlineClipboardCopy className="w-4 h-4" />}
-                                        {copied ? "Copied!" : "Copy"}
+                                        {copied ? t("buckets.share_modal.copied_btn") : t("buckets.share_modal.copy_btn")}
                                     </button>
                                 </div>
                             </div>
@@ -143,7 +145,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                                 onClick={() => setGeneratedUrl(null)}
                                 className="w-full py-2 text-body-md text-primary font-medium hover:underline cursor-pointer bg-transparent border-none outline-none"
                             >
-                                Generate another link with different expiration
+                                {t("buckets.share_modal.generate_another")}
                             </button>
                         </div>
                     )}

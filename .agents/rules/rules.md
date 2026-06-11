@@ -285,3 +285,8 @@ Pills and circles are strictly reserved for status indicators and notification b
 - **Cards:** Flat containers with a 1px border. No shadows. Use a header area with a slight #F8FAFC fill to separate titles from content.
 - **Lists:** Clean rows separated by 1px dividers (#E5E9F0). Hover states use a subtle #F8FAFC background shift.
 - **Data Tables:** High-density, utilizing JetBrains Mono for numeric values. Sticky headers use a #F8FAFC background to maintain context during scroll.
+
+## Internationalization (i18n)
+- **Localizable Strings:** All user-facing text, titles, table headers, labels, placeholders, tooltips, and error messages MUST use `react-i18next` (via the `t` function) for localization. Do not hardcode user-facing strings directly in components.
+- **Translation Keys:** Use descriptive, structured, and hierarchical keys (e.g., `buckets.explorer.title`) mapped to translation files in `src/shared/locales/`.
+- **Dynamic Values:** Use standard i18n interpolation parameter formatting (e.g., `t("my_routes.delete_confirm", { count: selectedIds.size })`) instead of manual string concatenation to ensure natural sentence structure and grammar in all languages.

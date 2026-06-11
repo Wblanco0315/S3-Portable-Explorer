@@ -14,6 +14,8 @@ import {
 } from 'react-icons/hi';
 import { useDownloadStore, DownloadTask } from '../features/downloads/downloadStore';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { safeConfirm as confirm } from '../shared/utils/dialog';
+import { useTranslation } from 'react-i18next';
 
 const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 B';
@@ -41,6 +43,7 @@ const DownloadItem = ({
     onRetry: (task: DownloadTask) => void;
     onPause: (task: DownloadTask) => void;
 }) => {
+    const { t } = useTranslation();
     const isDownloading = task.status === 'downloading' || task.status === 'queued';
     const isPaused = task.status === 'paused';
     const isError = task.status === 'error';
@@ -84,7 +87,7 @@ const DownloadItem = ({
                         <div className="mt-3">
                             <div className="flex justify-between mb-1 text-label-sm font-mono">
                                 <span className={isPaused ? 'text-secondary' : 'text-primary'}>
-                                    {task.status === 'queued' ? 'En cola...' : isPaused ? `Pausado... ${task.progress.toFixed(1)}%` : `Descargando... ${task.progress.toFixed(1)}%`}
+                                    {task.status === 'queued' ? t('downloads.queued') : isPaused ? t('downloads.paused_pct', { progress: task.progress.toFixed(1) }) : t('downloads.downloading_pct', { progress: task.progress.toFixed(1) })}
                                 </span>
                                 {task.status === 'downloading' && (
                                     <span className="text-on-surface-variant">{task.speed}</span>
@@ -105,14 +108,14 @@ const DownloadItem = ({
                             <>
                                 <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-primary">
                                     <HiOutlineCheckCircle size={14} />
-                                    Completado
+                                    {t('downloads.completed')}
                                 </div>
                                 <button
                                     onClick={() => onOpenFolder(task.savePath)}
                                     className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
                                     <HiOutlineFolderOpen size={14} />
-                                    Mostrar en carpeta
+                                    {t('downloads.show_in_folder')}
                                 </button>
                             </>
                         )}
@@ -121,14 +124,14 @@ const DownloadItem = ({
                             <>
                                 <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-error">
                                     <HiOutlineExclamationCircle size={14} />
-                                    Error: {task.error}
+                                    {t('downloads.error_prefix', { error: task.error })}
                                 </div>
                                 <button
                                     onClick={() => onRetry(task)}
                                     className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
                                     <HiOutlineRefresh size={14} />
-                                    Reintentar
+                                    {t('downloads.retry')}
                                 </button>
                             </>
                         )}
@@ -137,14 +140,14 @@ const DownloadItem = ({
                             <>
                                 <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-secondary">
                                     <HiOutlineClock size={14} />
-                                    Pausado
+                                    {t('downloads.paused')}
                                 </div>
                                 <button
                                     onClick={() => onRetry(task)}
                                     className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
                                 >
                                     <HiOutlineRefresh size={14} />
-                                    Reanudar
+                                    {t('downloads.resume')}
                                 </button>
                             </>
                         )}
@@ -155,7 +158,7 @@ const DownloadItem = ({
                                 className="flex items-center gap-1 text-label-sm font-mono font-semibold text-secondary hover:underline cursor-pointer"
                             >
                                 <HiOutlinePause size={14} />
-                                Pausar
+                                {t('downloads.pause')}
                             </button>
                         )}
                     </div>
@@ -164,9 +167,17 @@ const DownloadItem = ({
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                        onClick={() => onDelete(task.id)}
+                        onClick={async () => {
+                            const confirmed = await confirm(
+                                t('downloads.delete_confirm', { name: task.fileName }),
+                                { title: t('downloads.title'), kind: 'warning' }
+                            );
+                            if (confirmed) {
+                                onDelete(task.id);
+                            }
+                        }}
                         className="p-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
-                        title="Eliminar del historial"
+                        title={t('downloads.remove_tooltip')}
                     >
                         <HiOutlineX size={18} />
                     </button>
@@ -179,6 +190,7 @@ const DownloadItem = ({
 export default function DownloadsPage() {
     const { tasks, removeTask, clearHistory, retryTask, updateTask } = useDownloadStore();
     const [searchTerm, setSearchTerm] = useState('');
+    const { t } = useTranslation();
 
     const handleRetry = async (task: DownloadTask) => {
         try {
@@ -213,15 +225,23 @@ export default function DownloadsPage() {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-headline-lg font-bold text-on-surface">Historial de Descargas</h1>
-                        <p className="text-body-md text-on-surface-variant mt-1">Gestiona tus archivos descargados y el progreso actual.</p>
+                        <h1 className="text-headline-lg font-bold text-on-surface">{t('downloads.title')}</h1>
+                        <p className="text-body-md text-on-surface-variant mt-1">{t('downloads.subtitle')}</p>
                     </div>
                     <button
-                        onClick={clearHistory}
+                        onClick={async () => {
+                            const confirmed = await confirm(
+                                t('downloads.clear_history_confirm'),
+                                { title: t('downloads.title'), kind: 'warning' }
+                            );
+                            if (confirmed) {
+                                clearHistory();
+                            }
+                        }}
                         className="flex items-center justify-center gap-2 px-4 py-2 text-body-md font-medium text-error bg-surface-container border border-error/20 rounded hover:bg-error-container/25 transition-colors cursor-pointer"
                     >
                         <HiOutlineTrash size={16} />
-                        Limpiar Historial
+                        {t('downloads.clear_history')}
                     </button>
                 </div>
 
@@ -232,7 +252,7 @@ export default function DownloadsPage() {
                     </div>
                     <input
                         type="text"
-                        placeholder="Buscar por nombre de archivo o bucket..."
+                        placeholder={t('downloads.search_placeholder')}
                         className="block w-full pl-9 pr-3 py-2.5 border border-outline-variant rounded bg-surface-container text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -257,8 +277,8 @@ export default function DownloadsPage() {
                             <div className="mx-auto w-12 h-12 bg-surface-container-high rounded flex items-center justify-center text-on-surface-variant border border-outline-variant mb-4">
                                 <HiOutlineDownload size={22} />
                             </div>
-                            <p className="text-body-md text-on-surface font-semibold">No se encontraron archivos</p>
-                            <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Tu historial está vacío o no coincide con la búsqueda.</p>
+                            <p className="text-body-md text-on-surface font-semibold">{t('downloads.empty_title')}</p>
+                            <p className="text-label-sm text-on-surface-variant mt-1 font-mono">{t('downloads.empty_desc')}</p>
                         </div>
                     )}
                 </div>

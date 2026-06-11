@@ -1,46 +1,38 @@
 import React, { useEffect, useState } from "react";
-import { HiOutlineChartBar, HiOutlineClock, HiOutlineLink, HiOutlineDownload, HiOutlineDatabase, HiOutlineStar, HiChevronLeft, HiChevronRight } from "react-icons/hi";
+import { HiOutlineChartBar, HiOutlineClock, HiOutlineLink, HiOutlineDownload, HiOutlineDatabase, HiOutlineStar } from "react-icons/hi";
 import { useDatabase } from "../shared/hooks/useDatabase";
 import { getTopVisitedRoutes, Route } from "../features/favorites/favoritesStore";
 import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { Link } from "react-router-dom";
+import { getStatsSummary, StatsSummary } from "../features/statistics/statisticsDatabase";
+import { useTranslation } from "react-i18next";
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { navigateToRoute } = useRouteNavigator();
   const { getActionLogs } = useDatabase();
   const { tasks, initialize: initDownloads } = useDownloadStore();
 
   const [recentActions, setRecentActions] = useState<{ id: number; action_type: string; details: string; created_at: string }[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const handlePageSizeChange = (newSize: number) => {
-    setPageSize(newSize);
-    setCurrentPage(1);
-  };
-
-  const totalItems = recentActions.length;
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  const activePage = currentPage > totalPages ? 1 : currentPage;
-  
-  const startIndex = (activePage - 1) * pageSize;
-  const paginatedActions = recentActions.slice(startIndex, startIndex + pageSize);
+  // Statistics States
+  const [summary, setSummary] = useState<StatsSummary | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
   const loadData = async () => {
-    setIsLoading(true);
     try {
-      const [actions, rt] = await Promise.all([getActionLogs(), getTopVisitedRoutes()]);
-      setRecentActions(actions);
-      setRoutes(rt);
+      const [actions, rt, sum] = await Promise.all([
+        getActionLogs(),
+        getTopVisitedRoutes(),
+        getStatsSummary()
+      ]);
+      setRecentActions(actions.slice(0, 5));
+      setRoutes(rt.slice(0, 5));
+      setSummary(sum);
     } catch (error) {
       console.error("Failed to load dashboard data", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -51,11 +43,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Compute real metrics
-  const completedDownloads = tasks.filter(t => t.status === "completed");
-  const totalDownloadsCount = completedDownloads.length;
-  
-  const totalBytes = completedDownloads.reduce((sum, t) => sum + (t.totalSize || 0), 0);
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -63,61 +50,114 @@ export default function DashboardPage() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
-  const storageVal = formatBytes(totalBytes);
 
-  const activeBucketsCount = new Set(routes.map(r => r.bucket)).size;
+  // Map display period key
+  const periodKey: 'daily' | 'weekly' | 'monthly' = selectedPeriod;
+  const periodLabel = selectedPeriod === 'daily' ? t("dashboard.trends.today") : selectedPeriod === 'weekly' ? t("dashboard.trends.week") : t("dashboard.trends.month");
+
+  const completedDownloadsCount = summary ? summary[periodKey].completedDownloads : 0;
+  const storageVal = summary ? formatBytes(summary[periodKey].storageDownloaded) : "0 B";
+  const activeBucketsCount = summary ? summary[periodKey].activeBuckets : 0;
+  const activeRoutesCount = summary ? summary[periodKey].activeRoutes : 0;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 route-transition">
+    <div className="p-6 w-full h-full lg:overflow-hidden overflow-y-auto flex flex-col flex-1 space-y-6 route-transition">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-headline-lg font-bold text-on-surface">
-            Welcome Back
+            {t("dashboard.welcome")}
           </h1>
-          <p className="text-on-surface-variant text-body-md mt-1">Here's what's happening with your S3 backups today.</p>
+          <p className="text-on-surface-variant text-body-md mt-1">{t("dashboard.subtitle")}</p>
         </div>
-        <Link 
-          to="/buckets"
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium text-body-md rounded border border-transparent hover:bg-primary/95 transition-all duration-200 cursor-pointer"
-        >
-          <HiOutlineDatabase className="w-5 h-5" />
-          Explore Buckets
-        </Link>
+
+        <div className="flex items-center gap-3">
+          {/* Label selector for Today, Week, Month */}
+          <div className="relative flex bg-surface-container-low border border-outline-variant rounded p-0.5 w-60">
+            <div 
+              className="absolute top-[2px] bottom-[2px] left-[2px] rounded-sm bg-primary transition-transform duration-300 ease-out pointer-events-none"
+              style={{
+                width: 'calc((100% - 4px) / 3)',
+                transform: `translateX(${
+                  selectedPeriod === 'daily' 
+                    ? '0%' 
+                    : selectedPeriod === 'weekly' 
+                      ? '100%' 
+                      : '200%'
+                })`
+              }}
+            />
+            <button
+              onClick={() => setSelectedPeriod('daily')}
+              className={`relative z-10 flex-1 py-1.5 text-label-sm font-semibold rounded transition-colors duration-300 ease-in-out cursor-pointer ${selectedPeriod === 'daily'
+                ? "text-on-primary"
+                : "text-on-surface-variant hover:text-on-surface"
+                }`}
+            >
+              {t("dashboard.periods.today")}
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('weekly')}
+              className={`relative z-10 flex-1 py-1.5 text-label-sm font-semibold rounded transition-colors duration-300 ease-in-out cursor-pointer ${selectedPeriod === 'weekly'
+                ? "text-on-primary"
+                : "text-on-surface-variant hover:text-on-surface"
+                }`}
+            >
+              {t("dashboard.periods.week")}
+            </button>
+            <button
+              onClick={() => setSelectedPeriod('monthly')}
+              className={`relative z-10 flex-1 py-1.5 text-label-sm font-semibold rounded transition-colors duration-300 ease-in-out cursor-pointer ${selectedPeriod === 'monthly'
+                ? "text-on-primary"
+                : "text-on-surface-variant hover:text-on-surface"
+                }`}
+            >
+              {t("dashboard.periods.month")}
+            </button>
+          </div>
+
+          <Link
+            to="/buckets"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary font-medium text-body-md rounded border border-transparent hover:bg-primary/95 transition-all duration-200 cursor-pointer"
+          >
+            <HiOutlineDatabase className="w-5 h-5" />
+            {t("dashboard.explore")}
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard 
-          title="Completed Downloads" 
-          value={String(totalDownloadsCount)} 
-          trend={`${tasks.length} in history`}
+        <StatCard
+          title={t("dashboard.completed_downloads")}
+          value={String(completedDownloadsCount)}
+          trend={periodLabel}
           icon={<HiOutlineDownload className="w-5 h-5 text-primary" />}
         />
-        <StatCard 
-          title="Storage Downloaded" 
-          value={storageVal} 
-          trend="Total transferred"
+        <StatCard
+          title={t("dashboard.storage_downloaded")}
+          value={storageVal}
+          trend={periodLabel}
           icon={<HiOutlineChartBar className="w-5 h-5 text-tertiary" />}
         />
-        <StatCard 
-          title="Active Buckets (Routes)" 
-          value={String(activeBucketsCount)} 
-          trend={`${routes.length} saved paths`}
+        <StatCard
+          title={t("dashboard.active_buckets")}
+          value={String(activeBucketsCount)}
+          trend={`${activeRoutesCount} ${t("dashboard.active_routes_trend")}`}
           icon={<HiOutlineDatabase className="w-5 h-5 text-secondary" />}
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Favorites Section */}
-        <div className="bg-surface-container-low rounded-lg border border-outline-variant p-4 flex flex-col h-[480px] transition-colors">
+        <div className="bg-surface-container-low rounded-lg border border-outline-variant p-4 flex flex-col h-full lg:h-full min-h-0 transition-colors">
           <div className="flex items-center gap-3 mb-4 shrink-0">
             <div className="p-2 bg-surface-container-high text-primary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineLink className="w-5 h-5" />
             </div>
-            <h2 className="text-headline-md text-on-surface font-semibold">My Routes (Top Visited)</h2>
+            <h2 className="text-headline-md text-on-surface font-semibold">{t("dashboard.my_routes_top")}</h2>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
             {routes.length > 0 ? (
               <ul className="space-y-2">
@@ -138,8 +178,8 @@ export default function DashboardPage() {
                             </span>
                           )}
                           {(rt as any).visit_count > 0 && (
-                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded-sm text-label-sm font-mono border border-primary/20 shrink-0" title={`${(rt as any).visit_count} visitas`}>
-                              {(rt as any).visit_count} visits
+                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded-sm text-label-sm font-mono border border-primary/20 shrink-0" title={`${(rt as any).visit_count} ${t("dashboard.visits")}`}>
+                              {(rt as any).visit_count} {(rt as any).visit_count === 1 ? t("dashboard.visit") : t("dashboard.visits")}
                             </span>
                           )}
                         </div>
@@ -152,29 +192,29 @@ export default function DashboardPage() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline-variant rounded">
                 <HiOutlineLink className="w-8 h-8 text-on-surface-variant mb-2" />
-                <p className="text-body-md text-on-surface font-semibold">No routes yet</p>
-                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Add paths to "My Routes" in the explorer to see them here.</p>
+                <p className="text-body-md text-on-surface font-semibold">{t("dashboard.no_routes")}</p>
+                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">{t("dashboard.no_routes_desc")}</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Recent Activity Section */}
-        <div className="bg-surface-container-low rounded-lg border border-outline-variant p-4 flex flex-col h-[480px] transition-colors">
+        <div className="bg-surface-container-low rounded-lg border border-outline-variant p-4 flex flex-col h-full lg:h-full min-h-0 transition-colors">
           <div className="flex items-center gap-3 mb-4 shrink-0">
             <div className="p-2 bg-surface-container-high text-tertiary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineClock className="w-5 h-5" />
             </div>
-            <h2 className="text-headline-md text-on-surface font-semibold">Recent Activity</h2>
+            <h2 className="text-headline-md text-on-surface font-semibold">{t("dashboard.recent_activity")}</h2>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
             {recentActions.length > 0 ? (
               <ul className="space-y-2">
-                {paginatedActions.map((log) => {
+                {recentActions.map((log) => {
                   let Icon = HiOutlineClock;
                   let colorClass = "text-on-surface-variant group-hover:text-tertiary";
-                  
+
                   if (log.action_type === "download") {
                     Icon = HiOutlineDownload;
                     colorClass = "text-primary group-hover:scale-105";
@@ -187,8 +227,8 @@ export default function DashboardPage() {
                   }
 
                   return (
-                    <li 
-                      key={log.id} 
+                    <li
+                      key={log.id}
                       className="group flex items-center justify-between p-2.5 rounded hover:bg-surface-container-highest/50 border border-transparent hover:border-outline-variant/30 transition-colors mb-1.5"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
@@ -209,55 +249,11 @@ export default function DashboardPage() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 border border-dashed border-outline-variant rounded">
                 <HiOutlineClock className="w-8 h-8 text-on-surface-variant mb-2" />
-                <p className="text-body-md text-on-surface font-semibold">No recent activity</p>
-                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">Navigate through buckets or save paths to build your history.</p>
+                <p className="text-body-md text-on-surface font-semibold">{t("dashboard.no_activity")}</p>
+                <p className="text-label-sm text-on-surface-variant mt-1 font-mono">{t("dashboard.no_activity_desc")}</p>
               </div>
             )}
           </div>
-
-          {/* Pagination Controls */}
-          {recentActions.length > 0 && (
-            <div className="flex items-center justify-between border-t border-outline-variant/30 pt-3 mt-3 shrink-0 text-label-sm">
-              <div className="flex items-center gap-2">
-                <span className="text-on-surface-variant">Show</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                  className="bg-surface-container-high border border-outline-variant/50 rounded px-2 py-1 text-on-surface focus:outline-none focus:border-primary cursor-pointer text-label-sm font-mono"
-                >
-                  {[5, 10, 15, 20].map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-on-surface-variant font-mono">
-                  Page {activePage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={activePage === 1}
-                    className="p-1 rounded bg-surface-container-high border border-outline-variant/30 hover:border-outline-variant hover:bg-surface-container-highest disabled:opacity-40 disabled:cursor-not-allowed text-on-surface transition-colors cursor-pointer"
-                    title="Previous Page"
-                  >
-                    <HiChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={activePage === totalPages}
-                    className="p-1 rounded bg-surface-container-high border border-outline-variant/30 hover:border-outline-variant hover:bg-surface-container-highest disabled:opacity-40 disabled:cursor-not-allowed text-on-surface transition-colors cursor-pointer"
-                    title="Next Page"
-                  >
-                    <HiChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -272,7 +268,10 @@ function StatCard({ title, value, trend, icon }: { title: string, value: string,
         <div className="p-2 rounded bg-surface-container-high border border-outline-variant flex items-center justify-center">
           {icon}
         </div>
-        <span className="text-label-sm font-medium text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded-sm font-mono">
+        <span 
+          key={trend}
+          className="animate-fade-in text-label-sm font-semibold text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded-sm font-mono"
+        >
           {trend}
         </span>
       </div>

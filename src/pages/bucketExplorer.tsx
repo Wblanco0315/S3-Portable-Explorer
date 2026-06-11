@@ -19,8 +19,7 @@ import {
   HiOutlineSearch,
 } from "react-icons/hi";
 import { HiStar } from "react-icons/hi";
-import { open } from "@tauri-apps/plugin-dialog";
-import { readFile } from "@tauri-apps/plugin-fs";
+
 import {
   listBucketObjects,
   isAwsAuthenticated,
@@ -28,7 +27,6 @@ import {
   clearAwsCredentials,
   generatePresignedUrl,
   startS3Download,
-  uploadS3File,
   getCurrentActiveProfile,
   getAwsAccountDisplayName,
 } from "../features/aws/s3Client";
@@ -42,10 +40,11 @@ import {
 import { getLocalSSOCredentials } from "../features/aws/awsCli";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { useDatabase } from "../shared/hooks/useDatabase";
+import { recordBucketVisit, recordRouteVisit } from "../features/statistics/statisticsDatabase";
+import { useTranslation } from "react-i18next";
 
 // Atomic Components
 import { FavoriteModal } from "../features/explorer/components/FavoriteModal";
-import { UploadStatus } from "../features/explorer/components/UploadStatus";
 import { ShareModal } from "../features/explorer/components/ShareModal";
 import { S3Object, SortKey, SortConfig } from "../features/explorer/types";
 import { GenericTable, Column } from "../components/GenericTable";
@@ -101,6 +100,7 @@ export default function BucketExplorerPage() {
   const navigate = useNavigate();
   const { logAction } = useDatabase();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation();
 
   // Explorer State
   const [objects, setObjects] = useState<S3Object[]>([]);
@@ -129,9 +129,7 @@ export default function BucketExplorerPage() {
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [isSavingFavorite, setIsSavingFavorite] = useState(false);
 
-  // Feedback states
-  const [, setIsUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+
 
   // Share modal states
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -270,21 +268,56 @@ export default function BucketExplorerPage() {
       // Check if we need to swap profiles based on the favorite route
       try {
         const routes = await listRoutes();
-        const currentRoute = routes.find(
+        const sortedRoutes = [...routes].sort((a, b) => b.prefix.length - a.prefix.length);
+        const currentRoute = sortedRoutes.find(
           (r) => r.bucket === bucketName && (currentPrefix.startsWith(r.prefix) || r.prefix === ""),
         );
 
         if (currentRoute && currentRoute.profile !== getCurrentActiveProfile()) {
           console.log(`Swapping profile to: ${currentRoute.profile}`);
           setIsLoading(true);
-          const creds = await getLocalSSOCredentials(currentRoute.profile);
-          setAwsCredentials(
-            creds.accessKeyId,
-            creds.secretAccessKey,
-            creds.sessionToken,
-            localStorage.getItem("aws_region") || "us-east-1",
-          );
-          localStorage.setItem("aws_sso_profile", currentRoute.profile);
+          
+          if (currentRoute.profile.startsWith("sso-native-")) {
+            const targetAccountId = currentRoute.profile.replace("sso-native-", "");
+            const storedToken = localStorage.getItem("aws_sso_token");
+            const expiresAtStr = localStorage.getItem("aws_sso_token_expires_at");
+            const hasToken = storedToken && expiresAtStr && parseInt(expiresAtStr, 10) > Date.now();
+            const storedRoleName = localStorage.getItem("aws_sso_role_name");
+            const targetRegion = localStorage.getItem("aws_region") || "us-east-1";
+
+            if (hasToken) {
+              const { loginToNativeSsoAccount } = await import("../features/aws/awsSsoOidc");
+              const creds = await loginToNativeSsoAccount(
+                storedToken,
+                targetAccountId,
+                storedRoleName,
+                targetRegion
+              );
+              setAwsCredentials(
+                creds.accessKeyId,
+                creds.secretAccessKey,
+                creds.sessionToken,
+                targetRegion
+              );
+              localStorage.setItem("aws_sso_profile", currentRoute.profile);
+              localStorage.setItem("aws_sso_account_id", targetAccountId);
+              localStorage.setItem("aws_sso_account_name", creds.accountName);
+              localStorage.setItem("aws_sso_role_name", creds.roleName);
+              localStorage.setItem("aws_auth_method", "sso-native");
+            } else {
+              throw new Error("Cannot auto-swap profile: native SSO credentials or token missing/expired");
+            }
+          } else {
+            const creds = await getLocalSSOCredentials(currentRoute.profile);
+            setAwsCredentials(
+              creds.accessKeyId,
+              creds.secretAccessKey,
+              creds.sessionToken,
+              localStorage.getItem("aws_region") || "us-east-1",
+            );
+            localStorage.setItem("aws_sso_profile", currentRoute.profile);
+            localStorage.setItem("aws_auth_method", "sso");
+          }
         }
       } catch (err: any) {
         console.error("Auto-profile swap failed", err);
@@ -297,7 +330,8 @@ export default function BucketExplorerPage() {
         ) {
           setSsoNeedsLogin(true);
           const routes = await listRoutes();
-          const currentRoute = routes.find(
+          const sortedRoutes = [...routes].sort((a, b) => b.prefix.length - a.prefix.length);
+          const currentRoute = sortedRoutes.find(
             (r) => r.bucket === bucketName && (currentPrefix.startsWith(r.prefix) || r.prefix === ""),
           );
           setExpiredProfile(currentRoute?.profile || getCurrentActiveProfile() || "default");
@@ -312,6 +346,12 @@ export default function BucketExplorerPage() {
       
       // Log visit action
       logAction("visit", `Visited s3://${bucketName}/${currentPrefix}`);
+
+      // Record stats
+      if (bucketName) {
+        recordBucketVisit(bucketName).catch(err => console.error("Failed to record bucket visit stats:", err));
+        recordRouteVisit(bucketName, currentPrefix).catch(err => console.error("Failed to record route visit stats:", err));
+      }
     };
 
     initExplorer();
@@ -363,37 +403,7 @@ export default function BucketExplorerPage() {
     }
   };
 
-  const handleUpload = async () => {
-    if (!bucketName) return;
-    try {
-      const selected = await open({
-        multiple: true,
-        title: "Select files to upload",
-      });
-      if (!selected) return;
-      const files = Array.isArray(selected) ? selected : [selected];
-      setIsUploading(true);
-      let uploadedCount = 0;
-      for (const filePath of files) {
-        const fileName = filePath.split(/[\\/]/).pop() || "unknown";
-        setUploadStatus(
-          `Uploading ${fileName}... (${uploadedCount + 1}/${files.length})`,
-        );
-        const fileData = await readFile(filePath);
-        const s3Key = currentPrefix + fileName;
-        await uploadS3File(bucketName, s3Key, fileData);
-        uploadedCount++;
-      }
-      setUploadStatus(`Successfully uploaded ${uploadedCount} file(s)`);
-      setTimeout(() => setUploadStatus(null), 3000);
-      fetchObjects();
-    } catch (err: any) {
-      console.error("Upload failed", err);
-      alert("Upload failed: " + err.message);
-    } finally {
-      setIsUploading(false);
-    }
-  };
+
 
   const handleSort = (key: SortKey) => {
     setSortConfig((prev) => ({
@@ -462,7 +472,7 @@ export default function BucketExplorerPage() {
   const columns: Column<S3Object>[] = [
     {
       key: "name",
-      header: "Name",
+      header: t("buckets.explorer.name_col"),
       sortable: true,
       render: (obj) => {
         const downloadTask = downloadTasks.find(
@@ -497,7 +507,7 @@ export default function BucketExplorerPage() {
                     </>
                   ) : (
                     <div className="flex items-center gap-1 text-label-sm text-on-surface-variant font-mono uppercase tracking-wider">
-                      <HiOutlineClock className="w-3 h-3" /> Queued
+                      <HiOutlineClock className="w-3 h-3" /> {t("buckets.explorer.queued")}
                     </div>
                   )}
                 </div>
@@ -509,14 +519,14 @@ export default function BucketExplorerPage() {
     },
     {
       key: "type",
-      header: "Type",
+      header: t("buckets.explorer.type_col"),
       sortable: true,
       className:
         "text-on-surface-variant font-medium text-label-sm uppercase tracking-wider font-mono",
     },
     {
       key: "date",
-      header: "Last Modified",
+      header: t("buckets.explorer.date_col"),
       sortable: true,
       className: "text-on-surface-variant text-body-md",
       render: (obj) =>
@@ -524,13 +534,13 @@ export default function BucketExplorerPage() {
     },
     {
       key: "size",
-      header: "Size",
+      header: t("buckets.explorer.size_col"),
       sortable: true,
       className: "text-on-surface-variant text-body-md",
     },
     {
       key: "storageClass",
-      header: "Storage Class",
+      header: t("buckets.explorer.storage_col"),
       render: (obj) =>
         obj.storageClass !== "-" ? (
           <span className="px-1.5 py-0.5 bg-surface-container-high text-on-surface-variant font-medium text-label-sm rounded-sm uppercase border border-outline-variant tracking-wider font-mono">
@@ -560,7 +570,7 @@ export default function BucketExplorerPage() {
                     handleDownload(obj);
                   }}
                   className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded border border-transparent transition-all cursor-pointer"
-                  title="Download"
+                  title={t("buckets.explorer.download_btn")}
                 >
                   <HiOutlineDownload size={16} />
                 </button>
@@ -570,7 +580,7 @@ export default function BucketExplorerPage() {
                     handleShare(obj);
                   }}
                   className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded border border-transparent transition-all cursor-pointer"
-                  title="Share"
+                  title={t("buckets.share_modal.title")}
                 >
                   <HiOutlineShare size={16} />
                 </button>
@@ -588,7 +598,7 @@ export default function BucketExplorerPage() {
         <Breadcrumb
           items={[
             { label: getAwsAccountDisplayName(), path: "/buckets" },
-            { label: "Buckets", path: "/buckets" },
+            { label: t("buckets.title"), path: "/buckets" },
             {
               label: bucketName || "Bucket",
               onClick: () => updatePrefix(""),
@@ -618,7 +628,7 @@ export default function BucketExplorerPage() {
             <button
               onClick={handleToggleFavorite}
               className={`p-1.5 rounded transition-all cursor-pointer ${isFavorite ? "text-amber-400 bg-surface-container border border-amber-500/20" : "text-on-surface-variant bg-surface-container border border-outline-variant hover:text-amber-500 hover:bg-surface-container-high"}`}
-              title={isFavorite ? "Remove from My Routes" : "Add to My Routes"}
+              title={isFavorite ? t("buckets.explorer.remove_routes_title") : t("buckets.explorer.add_routes_title")}
             >
               {isFavorite ? <HiStar size={20} /> : <HiOutlineStar size={20} />}
             </button>
@@ -628,7 +638,7 @@ export default function BucketExplorerPage() {
             <button
               onClick={fetchObjects}
               className="p-2 bg-surface-container border border-outline-variant text-on-surface rounded hover:bg-surface-container-high transition-all cursor-pointer"
-              title="Refresh"
+              title={t("buckets.refresh")}
             >
               <HiOutlineRefresh
                 size={16}
@@ -636,15 +646,9 @@ export default function BucketExplorerPage() {
               />
             </button>
             <button
-              onClick={handleUpload}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-body-md font-medium rounded hover:bg-primary/95 transition-all border border-transparent cursor-pointer"
-            >
-              Upload Files
-            </button>
-            <button
               onClick={handleLogout}
               className="p-2 bg-error-container/20 text-error rounded hover:bg-error-container/30 border border-error/20 transition-all cursor-pointer"
-              title="Sign out"
+              title={t("buckets.sign_out")}
             >
               <HiOutlineLogout size={16} />
             </button>
@@ -661,7 +665,7 @@ export default function BucketExplorerPage() {
                     onClick={fetchObjects}
                     className="px-3 py-1.5 bg-error-container/50 hover:bg-error-container/80 text-on-error-container font-mono text-label-sm rounded transition-all cursor-pointer uppercase tracking-wider"
                   >
-                    Retry
+                    {t("buckets.explorer.retry_btn")}
                   </button>
                 )}
               </div>
@@ -670,10 +674,10 @@ export default function BucketExplorerPage() {
                 <div className="mt-2 p-3 bg-surface-container border border-outline-variant rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-300">
                   <div className="flex-1">
                     <h4 className="text-label-sm font-bold text-primary uppercase tracking-wider font-mono">
-                      SSO Session Expired
+                      {t("buckets.explorer.expired_title")}
                     </h4>
                     <p className="text-label-sm text-on-surface-variant font-medium mt-0.5 font-sans leading-relaxed">
-                      The active token for AWS profile '{expiredProfile}' has expired. Click below to re-authenticate in your browser.
+                      {t("buckets.explorer.expired_desc", { profile: expiredProfile })}
                     </p>
                   </div>
                   <button
@@ -708,7 +712,7 @@ export default function BucketExplorerPage() {
                     }}
                     className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/95 text-on-primary font-medium rounded transition-all text-body-md whitespace-nowrap cursor-pointer"
                   >
-                    Log in to AWS SSO
+                    {t("buckets.explorer.login_sso_btn")}
                   </button>
                 </div>
               )}
@@ -727,14 +731,14 @@ export default function BucketExplorerPage() {
                 <input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Filter objects by name..."
+                  placeholder={t("buckets.explorer.search_placeholder")}
                   className="w-full pl-9 pr-4 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
                 />
               </div>
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
                   <span className="text-label-sm font-medium text-primary bg-surface-container-high px-2 py-0.5 rounded-sm border border-outline-variant uppercase">
-                    {selectedIds.size} selected
+                    {t("buckets.explorer.selected_items", { count: selectedIds.size })}
                   </span>
                   <button
                     onClick={() => {
@@ -746,13 +750,13 @@ export default function BucketExplorerPage() {
                     }}
                     className="flex items-center gap-1.5 text-primary text-label-sm font-medium bg-surface-container-high px-3 py-1 rounded border border-outline-variant hover:bg-surface-container-highest transition-colors uppercase tracking-wider font-mono cursor-pointer"
                   >
-                    <HiOutlineDownload size={14} /> Download
+                    <HiOutlineDownload size={14} /> {t("buckets.explorer.download_btn")}
                   </button>
                 </div>
               )}
             </div>
             <div className="text-label-sm font-medium text-on-surface-variant font-mono uppercase tracking-wider">
-              {currentFiles.length} items
+              {t("buckets.explorer.items_count", { count: currentFiles.length })}
             </div>
           </div>
 
@@ -772,11 +776,9 @@ export default function BucketExplorerPage() {
             isAllSelected={isAllSelected}
             sortConfig={sortConfig as any}
             onSort={handleSort as any}
-            emptyMessage="This folder is empty"
+            emptyMessage={t("buckets.explorer.empty_folder")}
           />
         </div>
-
-        <UploadStatus status={uploadStatus} />
 
         <FavoriteModal
           isOpen={showFavoriteModal}

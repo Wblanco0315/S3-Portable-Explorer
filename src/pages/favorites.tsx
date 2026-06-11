@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   HiOutlineFolder,
   HiOutlineLink,
@@ -12,6 +12,7 @@ import {
   HiOutlineExternalLink,
   HiOutlineDownload,
   HiOutlineUpload,
+  HiOutlineDatabase,
 } from "react-icons/hi";
 import {
   listRoutes,
@@ -29,13 +30,16 @@ import {
 import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
-import { getAwsAccountDisplayName } from "../features/aws/s3Client";
+import { useTranslation } from "react-i18next";
+import { safeConfirm as confirm } from "../shared/utils/dialog";
 
 type Item = (Route | FavoriteFolder) & { type: "route" | "folder" };
 
 export default function FavoritesPage() {
   const { navigateToRoute } = useRouteNavigator();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
   const currentFolderId = searchParams.get("folder")
     ? parseInt(searchParams.get("folder")!)
     : null;
@@ -45,6 +49,23 @@ export default function FavoritesPage() {
       setSearchParams({});
     } else {
       setSearchParams({ folder: id.toString() });
+    }
+  };
+
+  const handleBackClick = () => {
+    if (currentFolderId !== null) {
+      if (breadcrumbPath.length <= 1) {
+        setCurrentFolderId(null);
+      } else {
+        const parent = breadcrumbPath[breadcrumbPath.length - 2];
+        setCurrentFolderId(parent.id ?? null);
+      }
+    } else {
+      if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
+        navigate(-1);
+      } else {
+        navigate("/");
+      }
     }
   };
 
@@ -175,11 +196,11 @@ export default function FavoritesPage() {
     try {
       const success = await exportFavorites();
       if (success) {
-        alert("Favorites exported successfully!");
+        alert(t("my_routes.export_success"));
       }
     } catch (err: any) {
       console.error("Export failed", err);
-      alert("Error exporting favorites: " + err.message);
+      alert(t("my_routes.export_error", { error: err.message }));
     }
   };
 
@@ -187,19 +208,19 @@ export default function FavoritesPage() {
     try {
       const success = await importFavorites();
       if (success) {
-        alert("Favorites imported successfully!");
+        alert(t("my_routes.import_success"));
         await loadData();
       }
     } catch (err: any) {
       console.error("Import failed", err);
-      alert("Error importing favorites: " + err.message);
+      alert(t("my_routes.import_error", { error: err.message }));
     }
   };
 
   const columns: Column<Item>[] = [
     {
       key: "name",
-      header: "Name",
+      header: t("my_routes.table.name_col"),
       render: (item) => {
         const isFolder = item.type === "folder";
         const cid = `${item.type}-${item.id}`;
@@ -241,7 +262,7 @@ export default function FavoritesPage() {
               {isOver && isFolder && (
                 <div className="flex items-center gap-1 mt-1 animate-in slide-in-from-top-1">
                   <span className="bg-primary text-on-primary text-label-sm px-1.5 py-0.5 rounded-sm font-semibold uppercase tracking-wider">
-                    Drop to move
+                    {t("my_routes.table.drop_move")}
                   </span>
                 </div>
               )}
@@ -252,14 +273,14 @@ export default function FavoritesPage() {
     },
     {
       key: "type",
-      header: "Type",
+      header: t("my_routes.table.type_col"),
       className:
         "text-on-surface-variant font-medium text-label-sm uppercase tracking-wider",
-      render: (item) => (item.type === "folder" ? "Folder" : "Route"),
+      render: (item) => (item.type === "folder" ? t("my_routes.table.folder_type") : t("my_routes.table.route_type")),
     },
     {
       key: "profile",
-      header: "Profile",
+      header: t("my_routes.table.profile_col"),
       render: (item) =>
         item.type === "route" ? (
           <span className="px-1.5 py-0.5 bg-surface-container-high text-on-surface-variant rounded-sm text-label-sm font-mono border border-outline-variant uppercase tracking-wider">
@@ -271,7 +292,7 @@ export default function FavoritesPage() {
     },
     {
       key: "path",
-      header: "S3 Path",
+      header: t("my_routes.table.path_col"),
       className: "font-mono text-label-sm text-on-surface-variant max-w-xs truncate",
       render: (item) =>
         item.type === "route" ? (
@@ -299,7 +320,7 @@ export default function FavoritesPage() {
                   )
                 }
                 className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
-                title="Copy S3 URI"
+                title={t("my_routes.table.copy_uri_tooltip")}
               >
                 {copiedId === item.id ? (
                   <HiOutlineCheck className="w-4 h-4 text-primary" />
@@ -310,20 +331,28 @@ export default function FavoritesPage() {
               <button
                 onClick={() => handleNavigate(item as Route)}
                 className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
-                title="Go to path"
+                title={t("my_routes.table.go_path_tooltip")}
               >
                 <HiOutlineExternalLink className="w-4 h-4" />
               </button>
             </>
           )}
           <button
-            onClick={() =>
-              item.type === "folder"
-                ? removeFolder(item.id!).then(loadData)
-                : removeRoute(item.id!).then(loadData)
-            }
+            onClick={async () => {
+              const msg = item.type === "folder"
+                ? t("my_routes.delete_folder_confirm", { name: item.name })
+                : t("my_routes.delete_route_confirm", { name: item.name });
+              const confirmed = await confirm(msg, { title: t("my_routes.title"), kind: "warning" });
+              if (confirmed) {
+                if (item.type === "folder") {
+                  removeFolder(item.id!).then(loadData);
+                } else {
+                  removeRoute(item.id!).then(loadData);
+                }
+              }
+            }}
             className="p-1.5 bg-surface-container border border-outline-variant text-error/80 hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
-            title="Delete"
+            title={t("my_routes.table.delete_tooltip")}
           >
             <HiOutlineTrash className="w-4 h-4" />
           </button>
@@ -336,9 +365,10 @@ export default function FavoritesPage() {
     <div className="flex-1 flex flex-col min-h-0 bg-surface p-6 animate-in fade-in duration-500 overflow-hidden">
       <div className="w-full flex-1 flex flex-col gap-6 min-h-0">
         <Breadcrumb
+          onBackClick={handleBackClick}
           items={[
             {
-              label: getAwsAccountDisplayName(),
+              label: t("my_routes.title"),
               onClick: () => setCurrentFolderId(null),
               active: !currentFolderId,
               onDragOver: (e) => onDragOver(e, "root", true),
@@ -365,36 +395,36 @@ export default function FavoritesPage() {
             <div className="p-2 bg-surface-container-high text-primary border border-outline-variant rounded flex items-center justify-center">
               <HiOutlineLink className="w-5 h-5" />
             </div>
-            <h1 className="text-headline-lg font-bold text-on-surface">My Routes</h1>
+            <h1 className="text-headline-lg font-bold text-on-surface">{t("my_routes.title")}</h1>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={loadData}
               className="p-2 bg-surface-container border border-outline-variant text-on-surface rounded hover:bg-surface-container-high transition-colors cursor-pointer"
-              title="Refresh"
+              title={t("buckets.refresh")}
             >
               <HiOutlineRefresh className="w-4 h-4" />
             </button>
             <button
               onClick={handleImport}
               className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-body-md font-medium rounded hover:bg-surface-container-high transition-colors cursor-pointer"
-              title="Import JSON Collection"
+              title={t("my_routes.import_tooltip")}
             >
-              <HiOutlineUpload className="w-4 h-4 text-on-surface-variant" /> Import
+              <HiOutlineUpload className="w-4 h-4 text-on-surface-variant" /> {t("my_routes.import_btn")}
             </button>
             <button
               onClick={handleExport}
               className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-body-md font-medium rounded hover:bg-surface-container-high transition-colors cursor-pointer"
-              title="Export JSON Collection"
+              title={t("my_routes.export_tooltip")}
             >
-              <HiOutlineDownload className="w-4 h-4 text-on-surface-variant" /> Export
+              <HiOutlineDownload className="w-4 h-4 text-on-surface-variant" /> {t("my_routes.export_btn")}
             </button>
             <button
               onClick={() => setIsAddingFolder(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-body-md font-medium rounded border border-transparent hover:bg-primary/95 transition-colors cursor-pointer"
             >
-              <HiOutlineFolderAdd className="w-4 h-4" /> New Folder
+              <HiOutlineFolderAdd className="w-4 h-4" /> {t("my_routes.new_folder_btn")}
             </button>
           </div>
         </div>
@@ -411,18 +441,49 @@ export default function FavoritesPage() {
                 <input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search routes and folders..."
+                  placeholder={t("my_routes.search_placeholder")}
                   className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary transition-all outline-none text-body-md text-on-surface"
                 />
               </div>
+              {searchTerm.trim().toLowerCase().startsWith("s3://") && (
+                <button
+                  onClick={() => {
+                    let cleanUrl = searchTerm.trim().slice(5);
+                    const slashIndex = cleanUrl.indexOf("/");
+                    let bucket = "";
+                    let prefix = "";
+                    if (slashIndex === -1) {
+                      bucket = cleanUrl;
+                    } else {
+                      bucket = cleanUrl.slice(0, slashIndex);
+                      prefix = cleanUrl.slice(slashIndex + 1);
+                    }
+                    if (bucket) {
+                      try {
+                        bucket = decodeURIComponent(bucket);
+                        prefix = decodeURIComponent(prefix);
+                      } catch (e) {}
+                      navigate(`/buckets/${bucket}?prefix=${encodeURIComponent(prefix)}`);
+                      setSearchTerm("");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary/20 transition-all uppercase tracking-wider cursor-pointer animate-in slide-in-from-left-2"
+                >
+                  <HiOutlineDatabase size={14} /> {t("my_routes.go_to_s3_btn")}
+                </button>
+              )}
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
                   <span className="text-label-sm font-semibold text-primary bg-primary-container/20 px-2 py-0.5 rounded-sm border border-primary-container/30 uppercase">
-                    {selectedIds.size} selected
+                    {t("my_routes.selected_items", { count: selectedIds.size })}
                   </span>
                   <button
                     onClick={async () => {
-                      if (!confirm(`Delete ${selectedIds.size} items?`)) return;
+                      const confirmed = await confirm(
+                        t("my_routes.delete_confirm", { count: selectedIds.size }),
+                        { title: t("my_routes.title"), kind: "warning" }
+                      );
+                      if (!confirmed) return;
                       for (const cid of selectedIds) {
                         const [type, id] = cid.split("-");
                         if (type === "folder") await removeFolder(parseInt(id));
@@ -433,13 +494,13 @@ export default function FavoritesPage() {
                     }}
                     className="flex items-center gap-1.5 text-error text-label-sm font-semibold bg-error-container/20 px-3 py-1.5 rounded border border-error-container/30 hover:bg-error-container/30 transition-colors uppercase tracking-wider cursor-pointer"
                   >
-                    <HiOutlineTrash size={14} /> Delete
+                    <HiOutlineTrash size={14} /> {t("my_routes.delete_btn")}
                   </button>
                 </div>
               )}
             </div>
             <div className="text-label-sm font-semibold text-on-surface-variant uppercase tracking-wider">
-              {displayItems.length} items
+              {t("my_routes.items_count", { count: displayItems.length })}
             </div>
           </div>
 
@@ -449,7 +510,7 @@ export default function FavoritesPage() {
                 autoFocus
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="Folder name"
+                placeholder={t("my_routes.new_folder_placeholder")}
                 className="flex-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded outline-none focus:border-primary text-body-md text-on-surface"
                 onKeyDown={(e) => {
                   if (e.key === "Enter")
@@ -471,13 +532,13 @@ export default function FavoritesPage() {
                 }
                 className="bg-primary text-on-primary px-4 py-1.5 rounded font-medium text-body-md hover:bg-primary/95 transition-colors cursor-pointer"
               >
-                Create
+                {t("my_routes.create_btn")}
               </button>
               <button
                 onClick={() => setIsAddingFolder(false)}
                 className="px-3 py-1.5 text-on-surface-variant font-medium hover:bg-surface-container-high rounded text-body-md transition-colors cursor-pointer"
               >
-                Cancel
+                {t("my_routes.cancel_btn")}
               </button>
             </div>
           )}
@@ -516,7 +577,7 @@ export default function FavoritesPage() {
               displayItems.length > 0 &&
               selectedIds.size === displayItems.length
             }
-            emptyMessage="No routes found"
+            emptyMessage={t("my_routes.empty_message")}
           />
         </div>
       </div>
