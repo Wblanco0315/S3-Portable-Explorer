@@ -66,7 +66,8 @@ export function useRouteNavigator() {
               creds.accessKeyId,
               creds.secretAccessKey,
               creds.sessionToken,
-              targetRegion
+              targetRegion,
+              creds.expiration
             );
 
             // Save persistent profile configs for the active account
@@ -84,7 +85,6 @@ export function useRouteNavigator() {
           }
         } catch (err) {
           console.warn(`Automatic native SSO login failed for '${targetProfile}'. Directing to login screen.`, err);
-          sessionStorage.removeItem("redirect_after_login");
           navigate("/buckets");
         } finally {
           hideLoading();
@@ -142,7 +142,8 @@ export function useRouteNavigator() {
               creds.accessKeyId,
               creds.secretAccessKey,
               creds.sessionToken,
-              targetRegion
+              targetRegion,
+              creds.expiration
             );
 
             // Save persistent profile configs for the active account
@@ -160,7 +161,6 @@ export function useRouteNavigator() {
           }
         } catch (err) {
           console.warn(`Automatic native SSO login failed for '${targetProfile}'. Directing to login screen.`, err);
-          sessionStorage.removeItem("redirect_after_login");
           navigate("/buckets");
         } finally {
           hideLoading();

@@ -128,7 +128,20 @@ window.fetch = async (input, init) => {
       console.log(`[TauriFetch] Headers passed to tauriFetch:`, Array.from((newInit.headers as Headers).entries()));
       const res = await tauriFetch(urlStr, newInit);
       console.log(`[TauriFetch] Status: ${res.status} for ${urlStr}`);
-      return res;
+      
+      const headers = new Headers();
+      res.headers.forEach((v, k) => {
+        headers.append(k, v);
+      });
+
+      const response = new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers
+      });
+
+      Object.defineProperty(response, "url", { value: urlStr });
+      return response;
     } catch (err) {
       console.error("[TauriFetch] Failed for AWS", err, { url: urlStr });
       throw err;
@@ -144,7 +157,7 @@ export const setAwsCredentials = (
   secretAccessKey: string,
   sessionToken?: string,
   region: string = "us-east-1",
-  expiration?: number
+  expiration?: number | Date | string
 ) => {
   s3ClientInstance = new S3Client({
     region,
@@ -155,7 +168,22 @@ export const setAwsCredentials = (
     }
   });
   if (expiration) {
-    localStorage.setItem("aws_credentials_expires_at", expiration.toString());
+    let expireTime: number;
+    if (expiration instanceof Date) {
+      expireTime = expiration.getTime();
+    } else if (typeof expiration === 'string') {
+      if (/^\d+$/.test(expiration)) {
+        expireTime = parseInt(expiration, 10);
+      } else {
+        expireTime = new Date(expiration).getTime();
+      }
+    } else {
+      expireTime = expiration;
+    }
+    if (!isNaN(expireTime) && expireTime < 100000000000) {
+      expireTime *= 1000;
+    }
+    localStorage.setItem("aws_credentials_expires_at", expireTime.toString());
   } else {
     localStorage.removeItem("aws_credentials_expires_at");
   }

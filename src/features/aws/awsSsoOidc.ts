@@ -181,25 +181,30 @@ export const getRoleCredentials = async (
   const ssoClient = new SSOClient({ region: ssoRegion });
   
   console.log(`[SSO] Requesting temporary credentials for account ${accountId}, role ${roleName}...`);
-  const res = await ssoClient.send(
-    new GetRoleCredentialsCommand({
-      accessToken,
-      accountId,
-      roleName,
-    })
-  );
-  
-  const creds = res.roleCredentials;
-  if (!creds || !creds.accessKeyId || !creds.secretAccessKey || !creds.sessionToken) {
-    throw new Error("AWS SSO returned incomplete or invalid role credentials.");
+  try {
+    const res = await ssoClient.send(
+      new GetRoleCredentialsCommand({
+        accessToken,
+        accountId,
+        roleName,
+      })
+    );
+    
+    const creds = res.roleCredentials;
+    if (!creds || !creds.accessKeyId || !creds.secretAccessKey || !creds.sessionToken) {
+      throw new Error("AWS SSO returned incomplete or invalid role credentials.");
+    }
+    
+    return {
+      accessKeyId: creds.accessKeyId,
+      secretAccessKey: creds.secretAccessKey,
+      sessionToken: creds.sessionToken,
+      expiration: creds.expiration,
+    };
+  } catch (err) {
+    console.error("[SSO] getRoleCredentials command failed:", err);
+    throw err;
   }
-  
-  return {
-    accessKeyId: creds.accessKeyId,
-    secretAccessKey: creds.secretAccessKey,
-    sessionToken: creds.sessionToken,
-    expiration: creds.expiration,
-  };
 };
 
 /**

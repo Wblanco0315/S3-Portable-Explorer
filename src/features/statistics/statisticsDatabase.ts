@@ -1,37 +1,7 @@
-import Database from "@tauri-apps/plugin-sql";
+import { getDb } from "../../shared/hooks/useDatabase";
 
-let db: Database | null = null;
-
-export const getStatsDb = async () => {
-    if (!db) {
-        db = await Database.load("sqlite:s3explorer.db");
-        
-        // Initialize stats tables
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS daily_downloads (
-                date TEXT PRIMARY KEY,
-                completed_count INTEGER DEFAULT 0,
-                bytes_downloaded INTEGER DEFAULT 0
-            )
-        `);
-
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS daily_active_buckets (
-                date TEXT NOT NULL,
-                bucket TEXT NOT NULL,
-                PRIMARY KEY (date, bucket)
-            )
-        `);
-
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS daily_active_routes (
-                date TEXT NOT NULL,
-                route_path TEXT NOT NULL,
-                PRIMARY KEY (date, route_path)
-            )
-        `);
-    }
-    return db;
+export const getStatsDb = () => {
+    return getDb();
 };
 
 // Helper for local YYYY-MM-DD string

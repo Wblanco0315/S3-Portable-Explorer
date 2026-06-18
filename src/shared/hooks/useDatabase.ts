@@ -1,21 +1,116 @@
 import Database from "@tauri-apps/plugin-sql";
 
-let dbInstance: Database | null = null;
+let dbPromise: Promise<Database> | null = null;
 
-export const getDb = async () => {
-  if (!dbInstance) {
-    dbInstance = await Database.load("sqlite:s3explorer.db");
-    // Initialize action_logs table
-    await dbInstance.execute(`
-      CREATE TABLE IF NOT EXISTS action_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        action_type TEXT NOT NULL,
-        details TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+export const getDb = (): Promise<Database> => {
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      const db = await Database.load("sqlite:s3explorer.db");
+      
+      // 1. Create action_logs
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS action_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          action_type TEXT NOT NULL,
+          details TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // 2. Create favorite_folders
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS favorite_folders (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          parent_id INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (parent_id) REFERENCES favorite_folders (id) ON DELETE CASCADE
+        )
+      `);
+
+      // 3. Create favorites
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS favorites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          bucket TEXT NOT NULL,
+          prefix TEXT NOT NULL,
+          profile TEXT NOT NULL DEFAULT 'default',
+          folder_id INTEGER,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (folder_id) REFERENCES favorite_folders (id) ON DELETE SET NULL
+        )
+      `);
+
+      // 4. Favorites migrations
+      try {
+        await db.execute("ALTER TABLE favorites ADD COLUMN folder_id INTEGER");
+      } catch (e) {}
+      try {
+        await db.execute("ALTER TABLE favorites ADD COLUMN profile TEXT NOT NULL DEFAULT 'default'");
+      } catch (e) {}
+      try {
+        await db.execute("ALTER TABLE favorites ADD COLUMN visit_count INTEGER DEFAULT 0");
+      } catch (e) {}
+
+      // 5. Create stats tables
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS daily_downloads (
+          date TEXT PRIMARY KEY,
+          completed_count INTEGER DEFAULT 0,
+          bytes_downloaded INTEGER DEFAULT 0
+        )
+      `);
+
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS daily_active_buckets (
+          date TEXT NOT NULL,
+          bucket TEXT NOT NULL,
+          PRIMARY KEY (date, bucket)
+        )
+      `);
+
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS daily_active_routes (
+          date TEXT NOT NULL,
+          route_path TEXT NOT NULL,
+          PRIMARY KEY (date, route_path)
+        )
+      `);
+
+      // 6. Create download tables
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS downloads (
+          id TEXT PRIMARY KEY,
+          fileName TEXT NOT NULL,
+          bucket TEXT NOT NULL,
+          s3Key TEXT NOT NULL,
+          status TEXT NOT NULL,
+          progress REAL DEFAULT 0,
+          speed TEXT,
+          totalSize INTEGER DEFAULT 0,
+          downloadedSize INTEGER DEFAULT 0,
+          error TEXT,
+          startTime INTEGER,
+          savePath TEXT NOT NULL
+        )
+      `);
+
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS download_chunks (
+          taskId TEXT NOT NULL,
+          chunkIndex INTEGER NOT NULL,
+          startByte INTEGER NOT NULL,
+          endByte INTEGER NOT NULL,
+          completed INTEGER DEFAULT 0,
+          PRIMARY KEY (taskId, chunkIndex)
+        )
+      `);
+
+      return db;
+    })();
   }
-  return dbInstance;
+  return dbPromise;
 };
 
 export const useDatabase = () => {

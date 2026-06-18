@@ -1,6 +1,6 @@
-import Database from "@tauri-apps/plugin-sql";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { getDb as getSharedDb } from "../../shared/hooks/useDatabase";
 
 export interface Route {
     id?: number;
@@ -19,49 +19,8 @@ export interface FavoriteFolder {
     created_at?: string;
 }
 
-let db: Database | null = null;
-
-const getDb = async () => {
-    if (!db) {
-        db = await Database.load("sqlite:s3explorer.db");
-        
-        // Create folders table
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS favorite_folders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                parent_id INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (parent_id) REFERENCES favorite_folders (id) ON DELETE CASCADE
-            )
-        `);
-
-        // Create favorites table with folder_id
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS favorites (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                bucket TEXT NOT NULL,
-                prefix TEXT NOT NULL,
-                profile TEXT NOT NULL DEFAULT 'default',
-                folder_id INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (folder_id) REFERENCES favorite_folders (id) ON DELETE SET NULL
-            )
-        `);
-
-        // Migrations
-        try {
-            await db.execute("ALTER TABLE favorites ADD COLUMN folder_id INTEGER");
-        } catch (e) {}
-        try {
-            await db.execute("ALTER TABLE favorites ADD COLUMN profile TEXT NOT NULL DEFAULT 'default'");
-        } catch (e) {}
-        try {
-            await db.execute("ALTER TABLE favorites ADD COLUMN visit_count INTEGER DEFAULT 0");
-        } catch (e) {}
-    }
-    return db;
+const getDb = () => {
+    return getSharedDb();
 };
 
 export const addRoute = async (route: Route) => {

@@ -1,42 +1,9 @@
-import Database from "@tauri-apps/plugin-sql";
 import { DownloadTask } from "./downloadStore";
 import { clearDownloadStats } from "../statistics/statisticsDatabase";
+import { getDb } from "../../shared/hooks/useDatabase";
 
-let db: Database | null = null;
-
-export const getDownloadDb = async () => {
-    if (!db) {
-        db = await Database.load("sqlite:s3explorer.db");
-        
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS downloads (
-                id TEXT PRIMARY KEY,
-                fileName TEXT NOT NULL,
-                bucket TEXT NOT NULL,
-                s3Key TEXT NOT NULL,
-                status TEXT NOT NULL,
-                progress REAL DEFAULT 0,
-                speed TEXT,
-                totalSize INTEGER DEFAULT 0,
-                downloadedSize INTEGER DEFAULT 0,
-                error TEXT,
-                startTime INTEGER,
-                savePath TEXT NOT NULL
-            )
-        `);
-
-        await db.execute(`
-            CREATE TABLE IF NOT EXISTS download_chunks (
-                taskId TEXT NOT NULL,
-                chunkIndex INTEGER NOT NULL,
-                startByte INTEGER NOT NULL,
-                endByte INTEGER NOT NULL,
-                completed INTEGER DEFAULT 0,
-                PRIMARY KEY (taskId, chunkIndex)
-            )
-        `);
-    }
-    return db;
+export const getDownloadDb = () => {
+    return getDb();
 };
 
 export const saveDownloadTask = async (task: DownloadTask) => {

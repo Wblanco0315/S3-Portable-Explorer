@@ -261,6 +261,8 @@ export default function BucketExplorerPage() {
   useEffect(() => {
     const initExplorer = async () => {
       if (!isAwsAuthenticated()) {
+        const currentPath = window.location.pathname + window.location.search;
+        sessionStorage.setItem("redirect_after_login", currentPath);
         navigate("/buckets", { replace: true });
         return;
       }
@@ -297,7 +299,8 @@ export default function BucketExplorerPage() {
                 creds.accessKeyId,
                 creds.secretAccessKey,
                 creds.sessionToken,
-                targetRegion
+                targetRegion,
+                creds.expiration
               );
               localStorage.setItem("aws_sso_profile", currentRoute.profile);
               localStorage.setItem("aws_sso_account_id", targetAccountId);

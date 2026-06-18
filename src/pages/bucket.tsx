@@ -216,7 +216,7 @@ export default function BucketPage() {
             targetRegion
           );
 
-          setAwsCredentials(creds.accessKeyId, creds.secretAccessKey, creds.sessionToken, targetRegion);
+          setAwsCredentials(creds.accessKeyId, creds.secretAccessKey, creds.sessionToken, targetRegion, creds.expiration);
 
           setSsoSelectedAccount({ accountId: storedAccountId, accountName: storedAccountName || storedAccountId });
           setSsoSelectedRole({ roleName: storedRoleName });
@@ -525,7 +525,8 @@ export default function BucketPage() {
         creds.accessKeyId,
         creds.secretAccessKey,
         creds.sessionToken,
-        ssoRegion.trim() || "us-east-1"
+        ssoRegion.trim() || "us-east-1",
+        creds.expiration
       );
 
       // Save persistent profile configs
@@ -551,6 +552,7 @@ export default function BucketPage() {
         navigate(pendingRedirect);
       }
     } catch (err: any) {
+      console.error("Failed to select role in handler:", err);
       setError(err.message || t("buckets.error_getting_role_creds"));
       setSsoAuthStep('select_role');
     } finally {
