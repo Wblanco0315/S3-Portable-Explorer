@@ -5,7 +5,7 @@ let dbPromise: Promise<Database> | null = null;
 export const getDb = (): Promise<Database> => {
   if (!dbPromise) {
     dbPromise = (async () => {
-      const db = await Database.load("sqlite:s3explorer.db");
+      const db = await Database.load("sqlite:s3explorer_data.db");
       
       // 1. Create action_logs
       await db.execute(`
@@ -106,6 +106,9 @@ export const getDb = (): Promise<Database> => {
           PRIMARY KEY (taskId, chunkIndex)
         )
       `);
+
+      // Truncate the WAL after init so a future crash leaves a minimal file that's safe to delete.
+      await db.execute("PRAGMA wal_checkpoint(TRUNCATE)").catch(() => {});
 
       return db;
     })();

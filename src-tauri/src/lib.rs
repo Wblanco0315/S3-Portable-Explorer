@@ -114,13 +114,28 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:s3explorer.db", migrations)
+                .add_migrations("sqlite:s3explorer_data.db", migrations)
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // Clean up orphaned SQLite WAL/SHM files left by a crash.
+            // A stale SHM file tricks SQLite into thinking another process holds
+            // a lock, which causes SQLITE_READONLY (code 8) on every subsequent launch.
+            if let Ok(data_dir) = app.path().app_data_dir() {
+                let wal = data_dir.join("s3explorer_data.db-wal");
+                let shm = data_dir.join("s3explorer_data.db-shm");
+                // Remove stale WAL/SHM files left by a crash. At process startup
+                // no other instance holds the database, so these files are orphaned.
+                // Leaving them causes SQLITE_READONLY on the next open.
+                if shm.exists() {
+                    let _ = std::fs::remove_file(&shm);
+                    let _ = std::fs::remove_file(&wal);
+                }
+            }
+
             let quit_i = MenuItemBuilder::new("Salir").id("quit").build(app)?;
             let show_i = MenuItemBuilder::new("Mostrar").id("show").build(app)?;
             let menu = MenuBuilder::new(app)
