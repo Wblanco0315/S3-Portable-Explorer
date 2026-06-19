@@ -184,12 +184,16 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .on_window_event(|_window, event| {
+        .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 #[cfg(not(dev))]
                 {
                     api.prevent_close();
                     let _ = window.hide();
+                }
+                #[cfg(dev)]
+                {
+                    let _ = api;
                 }
             }
         })
