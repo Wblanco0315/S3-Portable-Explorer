@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   HiOutlineFolder,
@@ -13,6 +13,7 @@ import {
   HiOutlineDownload,
   HiOutlineUpload,
   HiOutlineDatabase,
+  HiOutlineSwitchHorizontal,
 } from "react-icons/hi";
 import {
   listRoutes,
@@ -30,10 +31,11 @@ import {
 import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
+import { MoveToModal } from "../components/MoveToModal";
 import { useTranslation } from "react-i18next";
 import { safeConfirm as confirm } from "../shared/utils/dialog";
 
-type Item = (Route | FavoriteFolder) & { type: "route" | "folder" };
+type Item = (Route & { type: "route" }) | (FavoriteFolder & { type: "folder" });
 
 export default function FavoritesPage() {
   const { navigateToRoute } = useRouteNavigator();
@@ -77,11 +79,7 @@ export default function FavoritesPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<number | null>(null);
-
-  // DnD States
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [, setMovingId] = useState<string | null>(null);
+  const [moveItems, setMoveItems] = useState<Item[]>([]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -131,50 +129,17 @@ export default function FavoritesPage() {
     return path;
   }, [folders, currentFolderId]);
 
-  // DnD Handlers
-  const onDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedId(id);
-    e.dataTransfer.setData("text/plain", id);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const onDragEnd = () => {
-    setDraggedId(null);
-    setDropTargetId(null);
-  };
-
-  const onDragOver = (e: React.DragEvent, id: string, isFolder: boolean) => {
-    e.preventDefault();
-    if (draggedId === id) return;
-    if (isFolder || id === "root" || id.startsWith("bc-")) {
-      setDropTargetId(id);
-      e.dataTransfer.dropEffect = "move";
+  const handleMove = async (targetFolderId: number | null) => {
+    if (moveItems.length === 0) return;
+    for (const item of moveItems) {
+      if (item.type === "folder") {
+        await updateFolderParent(item.id!, targetFolderId);
+      } else {
+        await updateRouteFolder(item.id!, targetFolderId);
+      }
     }
-  };
-
-  const onDragLeave = () => setDropTargetId(null);
-
-  const onDrop = async (e: React.DragEvent, targetFolderId: number | null) => {
-    e.preventDefault();
-    const sourceCid = e.dataTransfer.getData("text/plain");
-    if (!sourceCid) return;
-
-    const [type, idStr] = sourceCid.split("-");
-    const id = parseInt(idStr);
-
-    if (type === "folder" && id === targetFolderId) return;
-
-    setMovingId(sourceCid);
-    try {
-      if (type === "folder") await updateFolderParent(id, targetFolderId);
-      else await updateRouteFolder(id, targetFolderId);
-      await loadData();
-    } catch (err) {
-      console.error("Move failed", err);
-    } finally {
-      setMovingId(null);
-      setDropTargetId(null);
-    }
+    setSelectedIds(new Set());
+    await loadData();
   };
 
   const toggleSelection = (cid: string | number) => {
@@ -223,48 +188,26 @@ export default function FavoritesPage() {
       header: t("my_routes.table.name_col"),
       render: (item) => {
         const isFolder = item.type === "folder";
-        const cid = `${item.type}-${item.id}`;
-        const isOver = dropTargetId === cid;
-
         return (
           <div className="flex items-center gap-3">
-            <div
-              className={`flex-shrink-0 transition-transform ${isFolder ? "text-primary" : "text-secondary"} ${isOver ? "scale-105" : "group-hover:scale-105"}`}
-            >
-              {isFolder ? (
-                <HiOutlineFolder size={20} />
-              ) : (
-                <HiOutlineLink size={20} />
-              )}
+            <div className={`flex-shrink-0 transition-transform group-hover:scale-105 ${isFolder ? "text-primary" : "text-secondary"}`}>
+              {isFolder ? <HiOutlineFolder size={20} /> : <HiOutlineLink size={20} />}
             </div>
-            <div className="flex flex-col min-w-0">
+            <div className="min-w-0">
               {isFolder ? (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentFolderId(item.id!);
-                  }}
-                  className={`font-semibold text-left hover:underline truncate transition-colors text-body-md ${isOver ? "text-primary font-bold" : "text-on-surface"}`}
+                  onClick={(e) => { e.stopPropagation(); setCurrentFolderId(item.id!); }}
+                  className="font-semibold text-left hover:underline truncate transition-colors text-body-md text-on-surface"
                 >
                   {item.name}
                 </button>
               ) : (
                 <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNavigate(item as Route);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleNavigate(item as Route); }}
                   className="font-semibold text-primary hover:underline cursor-pointer truncate text-body-md"
                 >
                   {item.name}
                 </span>
-              )}
-              {isOver && isFolder && (
-                <div className="flex items-center gap-1 mt-1 animate-in slide-in-from-top-1">
-                  <span className="bg-primary text-on-primary text-label-sm px-1.5 py-0.5 rounded-sm font-semibold uppercase tracking-wider">
-                    {t("my_routes.table.drop_move")}
-                  </span>
-                </div>
               )}
             </div>
           </div>
@@ -338,6 +281,13 @@ export default function FavoritesPage() {
             </>
           )}
           <button
+            onClick={(e) => { e.stopPropagation(); setMoveItems([item]); }}
+            className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
+            title={t("my_routes.table.move_tooltip")}
+          >
+            <HiOutlineSwitchHorizontal className="w-4 h-4" />
+          </button>
+          <button
             onClick={async () => {
               const msg = item.type === "folder"
                 ? t("my_routes.delete_folder_confirm", { name: item.name })
@@ -371,20 +321,11 @@ export default function FavoritesPage() {
               label: t("my_routes.title"),
               onClick: () => setCurrentFolderId(null),
               active: !currentFolderId,
-              onDragOver: (e) => onDragOver(e, "root", true),
-              onDragLeave: onDragLeave,
-              onDrop: (e) => onDrop(e, null),
-              isDropTarget: dropTargetId === "root",
             },
             ...breadcrumbPath.map((f, idx) => ({
               label: f.name,
               onClick: () => setCurrentFolderId(f.id!),
               active: idx === breadcrumbPath.length - 1,
-              onDragOver: (e: React.DragEvent) =>
-                onDragOver(e, `bc-${f.id}`, true),
-              onDragLeave: onDragLeave,
-              onDrop: (e: React.DragEvent) => onDrop(e, f.id!),
-              isDropTarget: dropTargetId === `bc-${f.id}`,
             })),
           ]}
         />
@@ -478,6 +419,16 @@ export default function FavoritesPage() {
                     {t("my_routes.selected_items", { count: selectedIds.size })}
                   </span>
                   <button
+                    onClick={() => {
+                      const selected = displayItems.filter(item => selectedIds.has(`${item.type}-${item.id}`));
+                      setMoveItems(selected);
+                    }}
+                    className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary-container/35 transition-colors uppercase tracking-wider cursor-pointer"
+                    title={t("my_routes.move_btn")}
+                  >
+                    <HiOutlineSwitchHorizontal size={14} /> {t("my_routes.move_btn")}
+                  </button>
+                  <button
                     onClick={async () => {
                       const confirmed = await confirm(
                         t("my_routes.delete_confirm", { count: selectedIds.size }),
@@ -493,6 +444,7 @@ export default function FavoritesPage() {
                       loadData();
                     }}
                     className="flex items-center gap-1.5 text-error text-label-sm font-semibold bg-error-container/20 px-3 py-1.5 rounded border border-error-container/30 hover:bg-error-container/30 transition-colors uppercase tracking-wider cursor-pointer"
+                    title={t("my_routes.delete_btn")}
                   >
                     <HiOutlineTrash size={14} /> {t("my_routes.delete_btn")}
                   </button>
@@ -553,16 +505,6 @@ export default function FavoritesPage() {
                 ? setCurrentFolderId(item.id!)
                 : handleNavigate(item as Route)
             }
-            onRowDragStart={(e, item) =>
-              onDragStart(e, `${item.type}-${item.id}`)
-            }
-            onRowDragOver={(e, item) =>
-              onDragOver(e, `${item.type}-${item.id}`, item.type === "folder")
-            }
-            onRowDragEnd={onDragEnd}
-            onRowDrop={(e, item) =>
-              item.type === "folder" ? onDrop(e, item.id!) : undefined
-            }
             selectedIds={selectedIds}
             onToggleSelection={toggleSelection}
             onSelectAll={() => {
@@ -581,6 +523,15 @@ export default function FavoritesPage() {
           />
         </div>
       </div>
+
+      {moveItems.length > 0 && (
+        <MoveToModal
+          moveItems={moveItems}
+          folders={folders}
+          onConfirm={handleMove}
+          onClose={() => setMoveItems([])}
+        />
+      )}
     </div>
   );
 }

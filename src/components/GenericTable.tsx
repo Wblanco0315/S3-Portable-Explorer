@@ -18,6 +18,7 @@ interface GenericTableProps<T> {
   onRowDragStart?: (e: React.DragEvent, item: T) => void;
   onRowDragEnd?: (e: React.DragEvent, item: T) => void;
   onRowDragOver?: (e: React.DragEvent, item: T) => void;
+  onRowDragLeave?: (e: React.DragEvent, item: T) => void;
   onRowDrop?: (e: React.DragEvent, item: T) => void;
   selectedIds?: Set<string | number>;
   onToggleSelection?: (id: string | number) => void;
@@ -28,6 +29,7 @@ interface GenericTableProps<T> {
   sortConfig?: { key: string; direction: "asc" | "desc" };
   onSort?: (key: any) => void;
   rowKey: (item: T) => string | number;
+  rowClassName?: (item: T) => string;
 }
 
 export function GenericTable<T>({
@@ -38,6 +40,7 @@ export function GenericTable<T>({
   onRowDragStart,
   onRowDragEnd,
   onRowDragOver,
+  onRowDragLeave,
   onRowDrop,
   selectedIds,
   onToggleSelection,
@@ -48,6 +51,7 @@ export function GenericTable<T>({
   sortConfig,
   onSort,
   rowKey,
+  rowClassName,
 }: GenericTableProps<T>) {
   const onDropWithId = (e: React.DragEvent, item: T) => {
     e.preventDefault();
@@ -156,9 +160,13 @@ export function GenericTable<T>({
                   onDragOver={
                     onRowDragOver ? (e) => onRowDragOver(e, item) : undefined
                   }
+                  onDragLeave={
+                    onRowDragLeave ? (e) => onRowDragLeave(e, item) : undefined
+                  }
                   onDrop={onRowDrop ? (e) => onDropWithId(e, item) : undefined}
                   className={`group cursor-pointer transition-all hover:bg-surface-container-highest/20 border-l-2 border-l-transparent
-                    ${isSelected ? "bg-surface-container border-l-primary" : ""}`}
+                    ${isSelected ? "bg-surface-container border-l-primary" : ""}
+                    ${rowClassName ? rowClassName(item) : ""}`}
                 >
                   {onToggleSelection && (
                     <td

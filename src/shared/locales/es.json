@@ -286,8 +286,18 @@
       "drop_move": "Soltar para mover",
       "copy_uri_tooltip": "Copiar URI S3",
       "go_path_tooltip": "Ir a la ruta",
-      "delete_tooltip": "Eliminar"
-    }
+      "delete_tooltip": "Eliminar",
+      "move_tooltip": "Mover a carpeta"
+    },
+    "move_btn": "Mover",
+    "move_modal_title": "Mover '{{name}}' a...",
+    "move_modal_title_multiple": "Mover {{count}} elementos a...",
+    "move_modal_root": "Mis Rutas (raíz)",
+    "move_modal_confirm": "Mover aquí",
+    "move_modal_cancel": "Cancelar",
+    "move_modal_current": "Ubicación actual",
+    "move_error_self": "La carpeta de destino seleccionada está en la lista de elementos a mover.",
+    "move_error_descendant": "La carpeta de destino es una subcarpeta de un elemento que se va a mover."
   },
   "error_page": {
     "title": "Error de la Aplicación",

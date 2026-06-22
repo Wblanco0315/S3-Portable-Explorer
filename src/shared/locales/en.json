@@ -286,8 +286,18 @@
       "drop_move": "Drop to move",
       "copy_uri_tooltip": "Copy S3 URI",
       "go_path_tooltip": "Go to path",
-      "delete_tooltip": "Delete"
-    }
+      "delete_tooltip": "Delete",
+      "move_tooltip": "Move to folder"
+    },
+    "move_btn": "Move",
+    "move_modal_title": "Move '{{name}}' to...",
+    "move_modal_title_multiple": "Move {{count}} items to...",
+    "move_modal_root": "My Routes (root)",
+    "move_modal_confirm": "Move here",
+    "move_modal_cancel": "Cancel",
+    "move_modal_current": "Current location",
+    "move_error_self": "The selected destination folder is in the list of items to be moved.",
+    "move_error_descendant": "The destination folder is a subfolder of an item to be moved."
   },
   "error_page": {
     "title": "Application Error",

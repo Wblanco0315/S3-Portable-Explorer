@@ -9,9 +9,7 @@ import {
 } from "react-icons/hi";
 import Breadcrumbs from "../../components/navigation/Breadcrumbs";
 import { useDownloadStore } from "../../features/downloads/downloadStore";
-import { useState, useEffect } from "react";
-import { HiOutlineLink, HiOutlineFolder } from "react-icons/hi";
-import { listFolders, FavoriteFolder } from "../../features/favorites/favoritesStore";
+import { HiOutlineLink } from "react-icons/hi";
 import { DownloadManager } from "../../features/downloads/downloadManager";
 import { useTheme } from "../ThemeContext";
 import { HiOutlineSun, HiOutlineMoon } from "react-icons/hi";
@@ -29,25 +27,7 @@ export default function DefaultLayout() {
   const activeDownloadsCount = tasks.filter(t => t.status === 'downloading' || t.status === 'queued').length;
   const { isLoading, message } = useLoadingStore();
 
-  const [folders, setFolders] = useState<FavoriteFolder[]>([]);
 
-
-  useEffect(() => {
-    listFolders().then(setFolders);
-  }, []);
-
-  const buildFolderTree = (parentId: number | null = null): NavItem[] => {
-    return folders
-      .filter(f => f.parent_id === parentId)
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map(f => ({
-        name: f.name,
-        path: `/favorites?folder=${f.id}`,
-        icon: HiOutlineFolder,
-        isLink: true,
-        children: buildFolderTree(f.id!)
-      }));
-  };
 
   const menuItems: NavItem[] = [
     { name: t("menu.main_menu"), path: "", isLink: false }, // Section header
@@ -71,7 +51,6 @@ export default function DefaultLayout() {
       path: "/favorites",
       icon: HiOutlineLink,
       isLink: true,
-      children: buildFolderTree(null),
     },
 
     { name: t("menu.other"), path: "", isLink: false }, // Section header
