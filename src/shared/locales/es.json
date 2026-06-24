@@ -242,6 +242,7 @@
     "queued": "En cola...",
     "paused_pct": "Pausado... {{progress}}%",
     "downloading_pct": "Descargando... {{progress}}%",
+    "downloading": "Descargando",
     "completed": "Completado",
     "show_in_folder": "Mostrar en carpeta",
     "error_prefix": "Error: {{error}}",
@@ -251,7 +252,10 @@
     "pause": "Pausar",
     "remove_tooltip": "Eliminar del historial",
     "delete_confirm": "¿Estás seguro de que deseas eliminar '{{name}}' del historial?",
-    "clear_history_confirm": "¿Estás seguro de que deseas limpiar todo el historial de descargas?"
+    "clear_history_confirm": "¿Estás seguro de que deseas limpiar todo el historial de descargas?",
+    "activity_map": "Mapa de Conexión y Actividad",
+    "chunks_completed": "bloques completados",
+    "remaining": "restante"
   },
   "my_routes": {
     "title": "Mis Rutas",

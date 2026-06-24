@@ -14,7 +14,52 @@ export interface DownloadTask {
     error?: string;
     startTime: number;
     savePath: string;
+    chunks?: {
+        index: number;
+        completed: boolean;
+        downloadedBytes: number;
+        totalBytes: number;
+    }[];
+    eta?: string;
 }
+
+// Trailing-edge throttle helper to limit database saves
+function throttleTrailing<T extends (...args: any[]) => void>(func: T, limit: number): T {
+    let lastFunc: number;
+    let lastRan: number;
+    return function(this: any, ...args: any[]) {
+        const context = this;
+        if (!lastRan) {
+            func.apply(context, args);
+            lastRan = Date.now();
+        } else {
+            clearTimeout(lastFunc);
+            lastFunc = window.setTimeout(function() {
+                if ((Date.now() - lastRan) >= limit) {
+                    func.apply(context, args);
+                    lastRan = Date.now();
+                }
+            }, limit - (Date.now() - lastRan));
+        }
+    } as any;
+}
+
+const throttledSaves = new Map<string, ReturnType<typeof throttleTrailing>>();
+
+const getThrottledSave = (taskId: string) => {
+    let throttledSave = throttledSaves.get(taskId);
+    if (!throttledSave) {
+        throttledSave = throttleTrailing((task: DownloadTask) => {
+            saveDownloadTask(task);
+        }, 2000); // Save to database at most once every 2 seconds during active downloading
+        throttledSaves.set(taskId, throttledSave);
+    }
+    return throttledSave;
+};
+
+export const clearThrottledSave = (taskId: string) => {
+    throttledSaves.delete(taskId);
+};
 
 interface DownloadStore {
     tasks: DownloadTask[];
@@ -53,12 +98,27 @@ export const useDownloadStore = create<DownloadStore>((set) => ({
 
     updateTask: (id, updates) => {
         set((state) => {
-            const newTasks = state.tasks.map((t) => t.id === id ? { ...t, ...updates } : t);
-            const updatedTask = newTasks.find(t => t.id === id);
-            if (updatedTask) {
-                // Save to DB (throttling might be good here but SQL plugin is fast enough for 500ms updates)
+            const currentTask = state.tasks.find(t => t.id === id);
+            if (!currentTask) return state;
+
+            const updatedTask = { ...currentTask, ...updates };
+            const newTasks = state.tasks.map((t) => t.id === id ? updatedTask : t);
+
+            // If we are changing to a final/transition state (completed, error, paused, etc.),
+            // save immediately. Otherwise, throttle the DB save.
+            const isStatusChange = updates.status && updates.status !== currentTask.status;
+            const isFinalState = updates.status && ['completed', 'error', 'paused', 'canceled'].includes(updates.status);
+
+            if (isStatusChange || isFinalState) {
+                // Cancel/remove throttled save for this task and save immediately
+                throttledSaves.delete(id);
                 saveDownloadTask(updatedTask);
+            } else {
+                // Throttle progress/speed saves
+                const throttledSave = getThrottledSave(id);
+                throttledSave(updatedTask);
             }
+
             return { tasks: newTasks };
         });
     },
@@ -73,7 +133,10 @@ export const useDownloadStore = create<DownloadStore>((set) => ({
                 startTime: Date.now()
             } : t);
             const updatedTask = newTasks.find(t => t.id === id);
-            if (updatedTask) saveDownloadTask(updatedTask);
+            if (updatedTask) {
+                throttledSaves.delete(id);
+                saveDownloadTask(updatedTask);
+            }
             return { tasks: newTasks };
         });
     },
@@ -82,6 +145,7 @@ export const useDownloadStore = create<DownloadStore>((set) => ({
         set((state) => ({
             tasks: state.tasks.filter((t) => t.id !== id)
         }));
+        throttledSaves.delete(id);
         deleteDownloadTask(id);
     },
 

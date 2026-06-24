@@ -87,80 +87,100 @@ const DownloadItem = ({
                         <div className="mt-3">
                             <div className="flex justify-between mb-1 text-label-sm font-mono">
                                 <span className={isPaused ? 'text-secondary' : 'text-primary'}>
-                                    {task.status === 'queued' ? t('downloads.queued') : isPaused ? t('downloads.paused_pct', { progress: task.progress.toFixed(1) }) : t('downloads.downloading_pct', { progress: task.progress.toFixed(1) })}
+                                    {task.status === 'queued' ? t('downloads.queued') : isPaused ? t('downloads.paused') : t('downloads.downloading')}
                                 </span>
                                 {task.status === 'downloading' && (
-                                    <span className="text-on-surface-variant">{task.speed}</span>
+                                    <span className="text-on-surface-variant font-medium">
+                                        {task.speed}
+                                        {task.eta && ` • ${task.eta} ${t('downloads.remaining')}`}
+                                    </span>
                                 )}
                             </div>
-                            <div className="w-full bg-surface-container rounded-sm h-1.5 overflow-hidden border border-outline-variant/30">
+                            
+                            <div className="relative w-full bg-surface-container rounded border border-outline-variant/30 h-6 overflow-hidden select-none">
+                                {/* Fill */}
                                 <div
-                                    className={`h-1.5 rounded-sm transition-all duration-300 ${isPaused ? 'bg-secondary' : 'bg-primary'}`}
+                                    className={`h-full rounded-l transition-all duration-150 ease-out ${isPaused ? 'bg-secondary' : 'bg-primary'}`}
                                     style={{ width: `${task.progress}%` }}
                                 ></div>
+
+                                {/* Text Overlay */}
+                                <div className="absolute inset-0 flex items-center justify-center font-mono text-label-sm font-bold text-on-surface">
+                                    <span className="mix-blend-difference text-white">
+                                        {task.status === 'queued' ? '0.0%' : `${task.progress.toFixed(1)}%`}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Status Feedback / Controls */}
-                    <div className="mt-2 flex items-center gap-4">
-                        {isCompleted && (
-                            <>
-                                <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-primary">
-                                    <HiOutlineCheckCircle size={14} />
-                                    {t('downloads.completed')}
-                                </div>
-                                <button
-                                    onClick={() => onOpenFolder(task.savePath)}
-                                    className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
-                                >
-                                    <HiOutlineFolderOpen size={14} />
-                                    {t('downloads.show_in_folder')}
-                                </button>
-                            </>
-                        )}
+                    {/* Status Feedback & Controls */}
+                    <div className="mt-2.5 flex items-center justify-between gap-4 w-full">
+                        {/* Status Label & Details (Left) */}
+                        <div className="flex items-center gap-4">
+                            {isCompleted && (
+                                <>
+                                    <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-primary">
+                                        <HiOutlineCheckCircle size={14} />
+                                        {t('downloads.completed')}
+                                    </div>
+                                    <button
+                                        onClick={() => onOpenFolder(task.savePath)}
+                                        className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
+                                    >
+                                        <HiOutlineFolderOpen size={14} />
+                                        {t('downloads.show_in_folder')}
+                                    </button>
+                                </>
+                            )}
 
-                        {isError && (
-                            <>
+                            {isError && (
                                 <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-error">
                                     <HiOutlineExclamationCircle size={14} />
                                     {t('downloads.error_prefix', { error: task.error })}
                                 </div>
-                                <button
-                                    onClick={() => onRetry(task)}
-                                    className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
-                                >
-                                    <HiOutlineRefresh size={14} />
-                                    {t('downloads.retry')}
-                                </button>
-                            </>
-                        )}
+                            )}
 
-                        {isPaused && (
-                            <>
+                            {isPaused && (
                                 <div className="flex items-center gap-1.5 text-label-sm font-mono font-medium text-secondary">
                                     <HiOutlineClock size={14} />
                                     {t('downloads.paused')}
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Action buttons (Right) */}
+                        <div className="flex items-center gap-3">
+                            {isError && (
                                 <button
                                     onClick={() => onRetry(task)}
-                                    className="flex items-center gap-1 text-label-sm font-mono font-semibold text-primary hover:underline cursor-pointer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm font-mono font-semibold text-primary bg-surface-container border border-outline-variant hover:bg-surface-container-high rounded transition-all cursor-pointer"
+                                >
+                                    <HiOutlineRefresh size={14} />
+                                    {t('downloads.retry')}
+                                </button>
+                            )}
+
+                            {isPaused && (
+                                <button
+                                    onClick={() => onRetry(task)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm font-mono font-semibold text-primary bg-surface-container border border-outline-variant hover:bg-surface-container-high rounded transition-all cursor-pointer"
                                 >
                                     <HiOutlineRefresh size={14} />
                                     {t('downloads.resume')}
                                 </button>
-                            </>
-                        )}
+                            )}
 
-                        {isDownloading && (
-                            <button
-                                onClick={() => onPause(task)}
-                                className="flex items-center gap-1 text-label-sm font-mono font-semibold text-secondary hover:underline cursor-pointer"
-                            >
-                                <HiOutlinePause size={14} />
-                                {t('downloads.pause')}
-                            </button>
-                        )}
+                            {isDownloading && task.status !== 'queued' && (
+                                <button
+                                    onClick={() => onPause(task)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-label-sm font-mono font-semibold text-secondary bg-surface-container border border-outline-variant hover:bg-surface-container-high rounded transition-all cursor-pointer"
+                                >
+                                    <HiOutlinePause size={14} />
+                                    {t('downloads.pause')}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 

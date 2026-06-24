@@ -242,6 +242,7 @@
     "queued": "Queued...",
     "paused_pct": "Paused... {{progress}}%",
     "downloading_pct": "Downloading... {{progress}}%",
+    "downloading": "Downloading",
     "completed": "Completed",
     "show_in_folder": "Show in folder",
     "error_prefix": "Error: {{error}}",
@@ -251,7 +252,10 @@
     "pause": "Pause",
     "remove_tooltip": "Remove from history",
     "delete_confirm": "Are you sure you want to remove '{{name}}' from the history?",
-    "clear_history_confirm": "Are you sure you want to clear all download history?"
+    "clear_history_confirm": "Are you sure you want to clear all download history?",
+    "activity_map": "Connection & Activity Map",
+    "chunks_completed": "chunks completed",
+    "remaining": "remaining"
   },
   "my_routes": {
     "title": "My Routes",

@@ -2,6 +2,7 @@
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::{Mutex, OnceLock};
+use futures_util::StreamExt;
 
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -30,6 +31,7 @@ async fn download_chunk(
     save_path: String,
     start_byte: u64,
     end_byte: u64,
+    on_progress: tauri::ipc::Channel<u64>,
 ) -> Result<u64, String> {
     // 1. Send HTTP request with Range header using the global shared keepalive client
     let client = get_http_client();
@@ -44,8 +46,17 @@ async fn download_chunk(
         return Err(format!("HTTP status error: {}", res.status()));
     }
 
-    let bytes = res.bytes().await.map_err(|e| e.to_string())?;
-    let len = bytes.len() as u64;
+    let mut stream = res.bytes_stream();
+    let mut buffer = Vec::with_capacity((end_byte - start_byte + 1) as usize);
+
+    while let Some(item) = stream.next().await {
+        let chunk_bytes = item.map_err(|e| e.to_string())?;
+        buffer.extend_from_slice(&chunk_bytes);
+        // Report progress back via the channel
+        let _ = on_progress.send(chunk_bytes.len() as u64);
+    }
+
+    let len = buffer.len() as u64;
 
     // 2. Lock and write to file at specific offset
     let join_result = tauri::async_runtime::spawn_blocking(move || {
@@ -59,7 +70,7 @@ async fn download_chunk(
         file.seek(SeekFrom::Start(start_byte))
             .map_err(|e| format!("Failed to seek file: {}", e))?;
 
-        file.write_all(&bytes)
+        file.write_all(&buffer)
             .map_err(|e| format!("Failed to write file: {}", e))?;
 
         Ok::<u64, String>(len)
