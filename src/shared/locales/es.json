@@ -90,6 +90,7 @@
   },
   "buckets": {
     "title": "Buckets",
+    "visited_buckets_action": "Visualizó la lista de S3 buckets",
     "name_col": "Nombre",
     "date_col": "Fecha de creación",
     "region_col": "Región de AWS",
@@ -235,6 +236,8 @@
   "downloads": {
     "title": "Historial de Descargas",
     "subtitle": "Gestiona tus archivos descargados y el progreso actual.",
+    "auth_required_title": "Autenticación Requerida",
+    "auth_required_desc": "Tienes descargas pendientes, pero no estás conectado a AWS o tu sesión ha expirado. ¿Deseas ir a la sección de Buckets para iniciar sesión ahora?",
     "clear_history": "Limpiar Historial",
     "search_placeholder": "Buscar por nombre de archivo o bucket...",
     "empty_title": "No se encontraron archivos",

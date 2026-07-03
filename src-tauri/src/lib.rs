@@ -15,6 +15,8 @@ fn get_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
         reqwest::Client::builder()
             .tcp_keepalive(Some(std::time::Duration::from_secs(60)))
+            .connect_timeout(std::time::Duration::from_secs(15))
+            .read_timeout(std::time::Duration::from_secs(15))
             .build()
             .unwrap_or_else(|_| reqwest::Client::new())
     })
@@ -195,12 +197,12 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|_window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 #[cfg(not(dev))]
                 {
                     api.prevent_close();
-                    let _ = window.hide();
+                    let _ = _window.hide();
                 }
                 #[cfg(dev)]
                 {

@@ -235,8 +235,8 @@ export default function DashboardPage() {
                         <div className={`shrink-0 transition-all ${colorClass}`}>
                           <Icon size={18} />
                         </div>
-                        <p className="text-body-md text-on-surface-variant truncate" title={log.details}>
-                          {log.details}
+                        <p className="text-body-md text-on-surface-variant truncate" title={t(log.details, log.details)}>
+                          {t(log.details, log.details)}
                         </p>
                       </div>
                       <span className="text-label-sm text-on-surface-variant font-mono shrink-0">

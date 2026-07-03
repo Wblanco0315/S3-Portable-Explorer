@@ -90,6 +90,7 @@
   },
   "buckets": {
     "title": "Buckets",
+    "visited_buckets_action": "Visited S3 buckets overview",
     "name_col": "Name",
     "date_col": "Creation date",
     "region_col": "AWS Region",
@@ -235,6 +236,8 @@
   "downloads": {
     "title": "Download History",
     "subtitle": "Manage your downloaded files and current progress.",
+    "auth_required_title": "Authentication Required",
+    "auth_required_desc": "You have pending downloads, but you are not connected to AWS or your session has expired. Would you like to go to the Buckets section to authenticate now?",
     "clear_history": "Clear History",
     "search_placeholder": "Search by filename or bucket...",
     "empty_title": "No files found",
