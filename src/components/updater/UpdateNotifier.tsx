@@ -23,6 +23,15 @@ export default function UpdateNotifier() {
   const [messageToast, setMessageToast] = useState<{ text: string; type: "success" | "info" | "error" } | null>(null);
 
   const checkForUpdates = async (manual = false) => {
+    const isTauri = typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
+    if (!isTauri) {
+      if (manual) {
+        setMessageToast({ text: "El actualizador solo funciona dentro de la aplicación de escritorio.", type: "info" });
+        setTimeout(() => setMessageToast(null), 4000);
+      }
+      return;
+    }
+
     if (manual) {
       setStatus("checking");
       setMessageToast({ text: t("updater.checking"), type: "info" });

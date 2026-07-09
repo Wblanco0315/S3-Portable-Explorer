@@ -9,6 +9,8 @@ import {
 import { getLocalSSOCredentials } from "../../features/aws/awsCli";
 import { Route, incrementRouteVisit } from "../../features/favorites/favoritesStore";
 import { useLoadingStore } from "./useLoadingStore";
+import { useSupabaseStore } from "../../features/supabase/supabaseStore";
+import { safeConfirm } from "../utils/dialog";
 
 export function useRouteNavigator() {
   const navigate = useNavigate();
@@ -25,6 +27,67 @@ export function useRouteNavigator() {
     const targetPath = `/buckets/${route.bucket}?prefix=${encodeURIComponent(route.prefix)}`;
     const currentProfile = getCurrentActiveProfile();
     const targetProfile = route.profile || "default";
+
+    if (targetProfile === "cloud-route") {
+      const isOnline = useSupabaseStore.getState().isOnline;
+      if (!isOnline) {
+        alert(t("cloud.offline_warning", "Esta es una ruta en la nube y estás sin conexión. Por favor conéctate."));
+        return;
+      }
+
+      showLoading(t("cloud.resolving_route", "Resolviendo ruta en la nube..."));
+      try {
+        // Fetch/refresh cloud routes to get latest credentials if any
+        await useSupabaseStore.getState().fetchRoutes();
+        const cloudRoutes = useSupabaseStore.getState().routes;
+        const cloudRoute = cloudRoutes.find(
+          (r) => r.bucket === route.bucket && r.prefix === route.prefix
+        );
+
+        if (!cloudRoute) {
+          hideLoading();
+          alert(t("cloud.route_not_found", "No se encontró la ruta correspondiente en la nube o no tienes permisos."));
+          return;
+        }
+
+        if (cloudRoute.aws_credentials) {
+          const c = cloudRoute.aws_credentials;
+          setAwsCredentials(
+            c.access_key_id,
+            c.secret_access_key,
+            c.session_token || undefined,
+            c.region
+          );
+          localStorage.setItem("aws_auth_method", "cloud-route");
+          localStorage.setItem("cloud_route_name", cloudRoute.name);
+          hideLoading();
+          navigate(targetPath);
+        } else {
+          hideLoading();
+          // Prompt for access request
+          const confirmed = await safeConfirm(
+            t("cloud.request_access_prompt", `La ruta '${cloudRoute.name}' requiere autorización. ¿Deseas enviar una solicitud de acceso al administrador?`),
+            { title: t("cloud.request_access_title", "Solicitar Acceso"), kind: "warning" }
+          );
+          if (confirmed) {
+            showLoading(t("cloud.sending_request", "Enviando solicitud de acceso..."));
+            const req = await useSupabaseStore.getState().createAccessRequest(cloudRoute.id);
+            hideLoading();
+            if (req) {
+              alert(t("cloud.request_sent_success", "Solicitud de acceso enviada al administrador. Por favor espera a que sea aprobada."));
+            } else {
+              alert(t("cloud.request_sent_failed", "Error al enviar la solicitud de acceso."));
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error("Cloud route resolution failed:", err);
+        hideLoading();
+        alert(t("cloud.resolution_error", `Error al resolver la ruta: ${err.message}`));
+      }
+      return;
+    }
+
     const isTargetNativeSSO = targetProfile.startsWith("sso-native-");
 
     if (currentProfile && currentProfile !== targetProfile) {

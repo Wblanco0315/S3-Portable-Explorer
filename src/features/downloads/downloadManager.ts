@@ -44,14 +44,18 @@ export const useDownloadManager = () => {
         // should be reset to 'queued' so it can be picked up again.
         const init = async () => {
             if (!initialized.current) {
-                await initializeStore();
-                // After loading from DB, check for stuck tasks
-                const currentTasks = useDownloadStore.getState().tasks;
-                currentTasks.forEach(t => {
-                    if (t.status === 'downloading') {
-                        updateTask(t.id, { status: 'queued', progress: 0, speed: '0 KB/s' });
-                    }
-                });
+                try {
+                    await initializeStore();
+                    // After loading from DB, check for stuck tasks
+                    const currentTasks = useDownloadStore.getState().tasks;
+                    currentTasks.forEach(t => {
+                        if (t.status === 'downloading') {
+                            updateTask(t.id, { status: 'queued', progress: 0, speed: '0 KB/s' });
+                        }
+                    });
+                } catch (e) {
+                    console.error("Failed to initialize download store:", e);
+                }
                 initialized.current = true;
             }
         };

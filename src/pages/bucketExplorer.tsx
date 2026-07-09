@@ -42,6 +42,7 @@ import { useDownloadStore } from "../features/downloads/downloadStore";
 import { useDatabase } from "../shared/hooks/useDatabase";
 import { recordBucketVisit, recordRouteVisit } from "../features/statistics/statisticsDatabase";
 import { useTranslation } from "react-i18next";
+import { useSupabaseStore } from "../features/supabase/supabaseStore";
 
 // Atomic Components
 import { FavoriteModal } from "../features/explorer/components/FavoriteModal";
@@ -113,6 +114,7 @@ export default function BucketExplorerPage() {
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter] = useState("all");
+  const [directPath, setDirectPath] = useState(currentPrefix);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "name",
     direction: "asc",
@@ -144,6 +146,30 @@ export default function BucketExplorerPage() {
       setCurrentPrefix(prefix);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    setDirectPath(currentPrefix);
+  }, [currentPrefix]);
+
+  // Cloud Route Session Cleanup on Unmount
+  useEffect(() => {
+    return () => {
+      const reqId = localStorage.getItem("active_access_request_id");
+      if (reqId) {
+        import("../features/supabase/supabaseClient").then(({ supabase }) => {
+          supabase
+            .from("access_requests")
+            .update({ status: "expired" })
+            .eq("id", reqId)
+            .then(() => {
+              localStorage.removeItem("active_access_request_id");
+              localStorage.removeItem("aws_auth_method");
+              localStorage.removeItem("cloud_route_name");
+            });
+        });
+      }
+    };
+  }, []);
 
   const updatePrefix = (newPrefix: string) => {
     setCurrentPrefix(newPrefix);
@@ -380,6 +406,21 @@ export default function BucketExplorerPage() {
 
       // Log favorite action
       logAction("favorite", `Marked s3://${bucketName}/${currentPrefix} as favorite '${favoriteName.trim()}'`);
+
+      // If logged into Supabase (online) and user is admin/superadmin, auto-save to cloud!
+      const isOnline = useSupabaseStore.getState().isOnline;
+      const profile = useSupabaseStore.getState().profile;
+      const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
+      if (isOnline && isAdmin) {
+        const region = localStorage.getItem("aws_region") || "us-east-1";
+        await useSupabaseStore.getState().createRoute(
+          favoriteName.trim(),
+          bucketName,
+          currentPrefix,
+          region,
+          null // passing null triggers auto-sync of current active credentials
+        );
+      }
     } catch (err: any) {
       console.error("Failed to add favorite", err);
       alert("Error saving favorite: " + err.message);
@@ -738,6 +779,30 @@ export default function BucketExplorerPage() {
                   className="w-full pl-9 pr-4 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono"
                 />
               </div>
+              <div className="relative w-full max-w-xs">
+                <input
+                  value={directPath}
+                  onChange={(e) => setDirectPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      let cleanPath = directPath.trim();
+                      if (cleanPath.toLowerCase().startsWith("s3://")) {
+                        cleanPath = cleanPath.slice(5);
+                        const slashIdx = cleanPath.indexOf("/");
+                        if (slashIdx !== -1) {
+                          cleanPath = cleanPath.slice(slashIdx + 1);
+                        } else {
+                          cleanPath = "";
+                        }
+                      }
+                      updatePrefix(cleanPath);
+                    }
+                  }}
+                  placeholder={t("buckets.explorer.direct_path_placeholder", "Ir a prefijo / URI s3...")}
+                  className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded text-body-md text-on-surface focus:outline-none focus:border-primary transition-all outline-none font-mono text-xs"
+                  title="Presiona Enter para navegar directamente a esta ruta"
+                />
+              </div>
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
                   <span className="text-label-sm font-medium text-primary bg-surface-container-high px-2 py-0.5 rounded-sm border border-outline-variant uppercase">
@@ -771,7 +836,7 @@ export default function BucketExplorerPage() {
             onRowClick={(obj) =>
               obj.type === "folder"
                 ? updatePrefix(obj.id)
-                : toggleSelection(obj.id)
+                : handleDownload(obj)
             }
             selectedIds={selectedIds}
             onToggleSelection={toggleSelection}

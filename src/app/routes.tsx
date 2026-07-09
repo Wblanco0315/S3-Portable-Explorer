@@ -11,6 +11,8 @@ import DownloadsPage from "../pages/downloads";
 import FavoritesPage from "../pages/favorites";
 import SettingsPage from "../pages/settings";
 import ErrorPage from "../pages/ErrorPage";
+import CloudRoutesPage from "../pages/cloudRoutes";
+import CloudGroupsPage from "../pages/cloudGroups";
 
 let routesConfig: RouteObject[] = [
   {
@@ -42,6 +44,16 @@ let routesConfig: RouteObject[] = [
         path: "/favorites",
         handle: { title: "My Routes" },
         element: <FavoritesPage />,
+      },
+      {
+        path: "/cloud-routes",
+        handle: { title: "Cloud Routes" },
+        element: <CloudRoutesPage />,
+      },
+      {
+        path: "/cloud-groups",
+        handle: { title: "Access Groups" },
+        element: <CloudGroupsPage />,
       },
       {
         path: "/settings",

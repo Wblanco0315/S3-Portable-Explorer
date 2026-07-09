@@ -24,11 +24,21 @@ import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { useDatabase } from "../shared/hooks/useDatabase";
 import { useTranslation } from "react-i18next";
+import { useSupabaseStore } from "../features/supabase/supabaseStore";
 
 export default function BucketPage() {
   const navigate = useNavigate();
   const { getSetting, saveSetting, logAction } = useDatabase();
   const { t } = useTranslation();
+
+  const isOnline = useSupabaseStore((state) => state.isOnline);
+  const userProfile = useSupabaseStore((state) => state.profile);
+
+  useEffect(() => {
+    if (isOnline && userProfile?.role === "user") {
+      navigate("/cloud-routes", { replace: true });
+    }
+  }, [isOnline, userProfile, navigate]);
 
   const [s3UrlInput, setS3UrlInput] = useState("");
 

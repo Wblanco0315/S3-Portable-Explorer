@@ -1,6 +1,6 @@
 [package]
 name = "s3explorer"
-version = "1.3.2"
+version = "2.0.0-beta-01"
 description = "Explore your S3 buckets easily and securely"
 authors = ["Wilson Blanco"]
 edition = "2021"

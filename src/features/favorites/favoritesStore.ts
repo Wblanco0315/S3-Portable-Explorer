@@ -58,6 +58,14 @@ export const updateRouteFolder = async (routeId: number, folderId: number | null
     );
 };
 
+export const updateRouteProfile = async (routeId: number, profile: string) => {
+    const database = await getDb();
+    return await database.execute(
+        "UPDATE favorites SET profile = $1 WHERE id = $2",
+        [profile, routeId]
+    );
+};
+
 export const updateFolderParent = async (folderId: number, parentId: number | null) => {
     const database = await getDb();
     // Prevent moving a folder into itself (simple check)

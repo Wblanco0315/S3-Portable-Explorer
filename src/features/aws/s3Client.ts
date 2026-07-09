@@ -12,6 +12,13 @@ import { recordDownloadCompleted } from "../statistics/statisticsDatabase";
 // We will store the client instance in memory after login
 let s3ClientInstance: S3Client | null = null;
 
+let activeCreds: {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+  region: string;
+} | null = null;
+
 // Store the absolute original native fetch once
 if (!(window as any).__originalFetch) {
   (window as any).__originalFetch = window.fetch;
@@ -167,6 +174,14 @@ export const setAwsCredentials = (
       ...(sessionToken && { sessionToken })
     }
   });
+
+  activeCreds = {
+    accessKeyId,
+    secretAccessKey,
+    sessionToken,
+    region
+  };
+
   if (expiration) {
     let expireTime: number;
     if (expiration instanceof Date) {
@@ -194,6 +209,7 @@ export const setAwsCredentials = (
 
 export const clearAwsCredentials = () => {
   s3ClientInstance = null;
+  activeCreds = null;
   localStorage.removeItem("aws_credentials_expires_at");
   // Clear regional client cache too
   Object.keys(regionClients).forEach(key => delete regionClients[key]);
@@ -201,6 +217,10 @@ export const clearAwsCredentials = () => {
 
 export const isAwsAuthenticated = () => {
   return s3ClientInstance !== null;
+};
+
+export const getActiveAwsCredentials = () => {
+  return activeCreds;
 };
 
 export const getCurrentActiveProfile = () => {
@@ -218,6 +238,9 @@ export const getAwsAccountDisplayName = () => {
     if (accId) {
       return `Amazon S3 (${accId})`;
     }
+  } else if (authMethod === "cloud-route") {
+    const routeName = localStorage.getItem("cloud_route_name");
+    return `Cloud S3 (${routeName || "Compartido"})`;
   } else {
     const profile = localStorage.getItem("aws_sso_profile");
     if (profile) {

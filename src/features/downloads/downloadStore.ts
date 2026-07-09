@@ -78,8 +78,12 @@ export const useDownloadStore = create<DownloadStore>((set) => ({
     maxConcurrentDownloads: 3,
 
     initialize: async () => {
-        const history = await getDownloadHistory();
-        set({ tasks: history });
+        try {
+            const history = await getDownloadHistory();
+            set({ tasks: history });
+        } catch (e) {
+            console.error("Failed to load download history from database:", e);
+        }
     },
 
     addTask: (task) => {

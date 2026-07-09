@@ -4,6 +4,10 @@ let dbPromise: Promise<Database> | null = null;
 
 export const getDb = (): Promise<Database> => {
   if (!dbPromise) {
+    const isTauri = typeof window !== "undefined" && (window as any).__TAURI_INTERNALS__ !== undefined;
+    if (!isTauri) {
+      return Promise.reject(new Error("Database is only available in the Tauri desktop application."));
+    }
     dbPromise = (async () => {
       const db = await Database.load("sqlite:s3explorer_data.db");
       
