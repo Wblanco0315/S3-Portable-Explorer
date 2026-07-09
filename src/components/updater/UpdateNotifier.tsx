@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { 
-  HiOutlineRefresh as IconRefresh, 
-  HiOutlineCloudDownload as IconDownload, 
-  HiOutlineCheckCircle as IconCheck, 
+import {
+  HiOutlineRefresh as IconRefresh,
+  HiOutlineCloudDownload as IconDownload,
+  HiOutlineCheckCircle as IconCheck,
   HiOutlineX as IconX,
-  HiOutlineInformationCircle as IconInfo
+  HiOutlineInformationCircle as IconInfo,
+  HiOutlineArrowRight as IconArrowRight
 } from "react-icons/hi";
 import { useTranslation } from "react-i18next";
 import pkg from "../../../package.json";
@@ -30,7 +31,7 @@ export default function UpdateNotifier() {
 
     try {
       const update = await check();
-      
+
       if (update) {
         setUpdateInfo(update);
         setIsOpen(true);
@@ -107,7 +108,7 @@ export default function UpdateNotifier() {
 
       setStatus("done");
       setMessageToast({ text: t("updater.success_installed"), type: "success" });
-      
+
       // Small pause to let user see success, then relaunch
       setTimeout(async () => {
         try {
@@ -124,20 +125,20 @@ export default function UpdateNotifier() {
     } catch (err: any) {
       console.error("Installation failed:", err);
       setStatus("error");
-      
+
       const rawError = err.message || String(err);
       let friendlyError = rawError;
-      
+
       // Check for common permission issues on Windows
       if (
-        rawError.toLowerCase().includes("access") || 
-        rawError.toLowerCase().includes("permission") || 
+        rawError.toLowerCase().includes("access") ||
+        rawError.toLowerCase().includes("permission") ||
         rawError.toLowerCase().includes("denied") ||
         rawError.toLowerCase().includes("privilege")
       ) {
         friendlyError = t("updater.permission_error_desc");
       }
-      
+
       setErrorMsg(friendlyError);
       setMessageToast({ text: t("updater.install_failed"), type: "error" });
     }
@@ -157,19 +158,13 @@ export default function UpdateNotifier() {
       {/* Toast Notification for manual checks / success */}
       {messageToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-300">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md transition-all ${
-            messageToast.type === "success" 
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
-              : messageToast.type === "error"
-              ? "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400"
-              : "bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-400"
-          }`}>
-            {messageToast.type === "success" && <IconCheck className="w-5 h-5 flex-shrink-0 animate-bounce" />}
-            {messageToast.type === "error" && <IconInfo className="w-5 h-5 flex-shrink-0" />}
-            {messageToast.type === "info" && <IconRefresh className="w-5 h-5 flex-shrink-0 animate-spin" />}
-            <span className="text-sm font-semibold">{messageToast.text}</span>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 border-outline-variant bg-surface-container text-on-surface shadow-2xl backdrop-blur-md transition-all">
+            {messageToast.type === "success" && <IconCheck className="w-5 h-5 flex-shrink-0 text-primary animate-bounce" />}
+            {messageToast.type === "error" && <IconInfo className="w-5 h-5 flex-shrink-0 text-error" />}
+            {messageToast.type === "info" && <IconRefresh className="w-5 h-5 flex-shrink-0 text-primary animate-spin" />}
+            <span className="font-body-sm text-body-sm font-semibold">{messageToast.text}</span>
             {messageToast.type !== "info" && (
-              <button onClick={() => setMessageToast(null)} className="ml-2 hover:opacity-75 cursor-pointer">
+              <button onClick={() => setMessageToast(null)} className="ml-2 hover:text-primary text-on-surface-variant cursor-pointer transition-colors">
                 <IconX className="w-4 h-4" />
               </button>
             )}
@@ -181,56 +176,69 @@ export default function UpdateNotifier() {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in-0 duration-300"
             onClick={() => status !== "downloading" && status !== "done" && setIsOpen(false)}
           />
 
           {/* Modal Container */}
-          <div className="bg-white dark:bg-slate-900/95 border border-gray-200/60 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden w-full max-w-md backdrop-blur-md transform transition-all animate-in zoom-in-95 duration-200 z-10">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-start">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                  <IconDownload className="w-6 h-6 animate-bounce" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-slate-50">{t("updater.title")}</h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400">{t("updater.subtitle")}</p>
-                </div>
+          <div className="bg-surface-container border-2 border-outline-variant rounded-lg overflow-hidden w-full max-w-md backdrop-blur-md transform transition-all animate-in zoom-in-95 duration-200 relative z-10">
+
+            {/* Absolute close button */}
+            {status !== "downloading" && status !== "done" && (
+              <button
+                onClick={() => setIsOpen(false)}
+                className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface p-1.5 hover:bg-surface-container-high rounded cursor-pointer transition-colors border border-transparent z-20"
+              >
+                <IconX className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Centered Header */}
+            <div className="p-8 pb-4 text-center border-b border-outline-variant bg-surface-variant">
+              <div className="w-16 h-16 bg-primary-container/20 border border-primary/30 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                <IconDownload className="w-8 h-8" />
               </div>
-              {status !== "downloading" && status !== "done" && (
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 p-1.5 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
-                >
-                  <IconX className="w-5 h-5" />
-                </button>
-              )}
+              <h2 className="font-headline-md text-headline-md text-on-surface font-bold mb-1">
+                {t("updater.title")}
+              </h2>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                {t("updater.subtitle")}
+              </p>
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               {/* Version Comparison */}
-              <div className="flex items-center justify-around bg-gray-50/50 dark:bg-slate-950/30 border border-gray-100 dark:border-slate-800/40 rounded-xl p-3">
+              <div className="flex justify-center items-center gap-6 bg-surface-container-low border border-outline-variant p-3 rounded-lg">
                 <div className="text-center">
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400">{t("updater.current_version")}</p>
-                  <p className="text-sm font-black text-gray-600 dark:text-slate-400">v{pkg.version}</p>
+                  <span className="block font-label-sm text-label-sm font-bold text-on-surface-variant uppercase tracking-wider">
+                    {t("updater.current_version")}
+                  </span>
+                  <span className="font-label-md text-label-md text-on-surface-variant">
+                    v{pkg.version}
+                  </span>
                 </div>
-                <div className="w-8 h-px bg-gray-200 dark:bg-slate-800" />
+                <div className="text-on-surface-variant">
+                  <IconArrowRight className="w-4 h-4" />
+                </div>
                 <div className="text-center">
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-indigo-500">{t("updater.available_version")}</p>
-                  <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">v{updateInfo?.version}</p>
+                  <span className="block font-label-sm text-label-sm font-bold text-primary uppercase tracking-wider">
+                    {t("updater.available_version")}
+                  </span>
+                  <span className="font-label-md text-label-md text-primary font-bold">
+                    v{updateInfo?.version}
+                  </span>
                 </div>
               </div>
 
               {/* Release Notes */}
               {updateInfo?.body && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1 flex items-center gap-1.5">
-                    <IconInfo className="w-4 h-4" /> {t("updater.release_notes")}
+                <div className="space-y-1">
+                  <p className="font-body-sm text-body-sm font-semibold text-on-surface-variant flex items-center gap-1.5">
+                    <IconInfo className="w-4 h-4 text-primary" /> {t("updater.release_notes")}
                   </p>
-                  <div className="max-h-36 overflow-y-auto bg-gray-50/50 dark:bg-slate-950/50 border border-gray-100 dark:border-slate-800/60 rounded-xl p-3.5 text-xs text-gray-600 dark:text-slate-300 font-sans leading-relaxed shadow-inner">
+                  <div className="max-h-36 overflow-y-auto bg-surface-container-low border border-outline-variant rounded-lg p-3 text-body-sm text-on-surface font-sans leading-relaxed">
                     {updateInfo.body}
                   </div>
                 </div>
@@ -239,13 +247,13 @@ export default function UpdateNotifier() {
               {/* Progress and status message */}
               {status === "downloading" && (
                 <div className="space-y-2 pt-2 animate-in fade-in-0 duration-300">
-                  <div className="w-full bg-gray-100 dark:bg-slate-950 h-2.5 rounded-full overflow-hidden border border-gray-200/20 dark:border-slate-800 shadow-inner">
-                    <div 
-                      className="bg-indigo-600 dark:bg-indigo-500 h-full rounded-full transition-all duration-300 bg-gradient-to-r from-indigo-600 to-violet-600" 
+                  <div className="w-full bg-surface-container-low h-2.5 rounded-full overflow-hidden border border-outline-variant">
+                    <div
+                      className="bg-primary h-full rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 dark:text-slate-400">
+                  <div className="flex justify-between items-center font-label-sm text-label-sm text-on-surface-variant">
                     <span className="animate-pulse">{t("updater.downloading")}</span>
                     <span>{progress}% {totalBytes > 0 && `(${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)})`}</span>
                   </div>
@@ -253,35 +261,35 @@ export default function UpdateNotifier() {
               )}
 
               {status === "done" && (
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm pt-2 animate-in fade-in-0 duration-300 justify-center">
+                <div className="flex items-center gap-2 text-primary font-semibold text-body-sm pt-2 animate-in fade-in-0 duration-300 justify-center">
                   <IconCheck className="w-5 h-5 animate-bounce" />
                   <span>{t("updater.complete")}</span>
                 </div>
               )}
 
               {status === "error" && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3.5 text-xs text-red-600 dark:text-red-400 font-medium">
+                <div className="bg-error-container/10 border border-error/20 rounded-lg p-3.5 text-body-sm text-error font-medium">
                   <p className="font-bold flex items-center gap-1"><IconInfo className="w-4 h-4" /> {t("updater.error_title")}</p>
                   <p className="mt-1 opacity-90">{errorMsg}</p>
                 </div>
               )}
             </div>
 
-            {/* Footer */}
+            {/* Footer (Stacked Buttons) */}
             {status !== "downloading" && status !== "done" && (
-              <div className="p-6 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3 bg-gray-50/50 dark:bg-slate-950/20">
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-350 hover:bg-gray-50 dark:hover:bg-slate-800 text-sm font-semibold rounded-lg transition-colors cursor-pointer"
-                >
-                  {t("updater.later_btn")}
-                </button>
+              <div className="px-6 pb-6 flex flex-col gap-3 bg-surface-container">
                 <button
                   onClick={handleDownloadAndInstall}
-                  className="flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow-indigo-500/10 hover:shadow-lg transition-all cursor-pointer"
+                  className="w-full bg-primary hover:bg-primary/95 text-on-primary px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <IconDownload className="w-4 h-4" />
                   {t("updater.update_btn")}
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="w-full bg-surface-container hover:bg-surface-container-high text-on-surface border border-outline-variant hover:border-outline px-6 py-3 rounded-lg font-medium transition-colors cursor-pointer"
+                >
+                  {t("updater.later_btn")}
                 </button>
               </div>
             )}
