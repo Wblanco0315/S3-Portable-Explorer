@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
-  HiOutlineFolder,
   HiOutlineLink,
   HiOutlineRefresh,
   HiOutlineSearch,
@@ -15,7 +14,11 @@ import {
   HiOutlineDatabase,
   HiOutlineSwitchHorizontal,
   HiOutlinePencil,
+  HiOutlineDotsVertical,
+  HiOutlineColorSwatch,
+  HiOutlineX,
 } from "react-icons/hi";
+import { FolderIcon } from "../components/FolderIcon";
 import {
   listRoutes,
   listFolders,
@@ -30,12 +33,12 @@ import {
   importFavorites,
   renameRoute,
   renameFolder,
+  updateFolderColor,
 } from "../features/favorites/favoritesStore";
 import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { MoveToModal } from "../components/MoveToModal";
-import { RenameModal } from "../components/RenameModal";
 import { useTranslation } from "react-i18next";
 import { safeConfirm as confirm } from "../shared/utils/dialog";
 import {
@@ -97,10 +100,15 @@ export default function FavoritesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingFolder, setIsAddingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderColor, setNewFolderColor] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [moveItems, setMoveItems] = useState<Item[]>([]);
-  const [renamingItem, setRenamingItem] = useState<Item | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [inlineRenamingId, setInlineRenamingId] = useState<string | null>(null);
+  const [inlineRenamingName, setInlineRenamingName] = useState<string>("");
+  const [inlineColorId, setInlineColorId] = useState<string | null>(null);
+  const [pendingColor, setPendingColor] = useState<string | null | undefined>(undefined);
 
   const [draggedItem, setDraggedItem] = useState<Item | null>(null);
   const [movingRowId, setMovingRowId] = useState<string | null>(null);
@@ -299,14 +307,35 @@ export default function FavoritesPage() {
     await loadData();
   };
 
-  const handleRename = async (newName: string) => {
-    if (!renamingItem) return;
-    if (renamingItem.type === "folder") {
-      await renameFolder(renamingItem.id!, newName);
-    } else {
-      await renameRoute(renamingItem.id!, newName);
+
+
+  const handleInlineRenameSubmit = async (item: Item) => {
+    const trimmed = inlineRenamingName.trim();
+    if (!trimmed || trimmed === item.name) {
+      setInlineRenamingId(null);
+      return;
     }
-    await loadData();
+    try {
+      if (item.type === "folder") {
+        await renameFolder(item.id!, trimmed);
+      } else {
+        await renameRoute(item.id!, trimmed);
+      }
+      await loadData(true);
+    } catch (err) {
+      console.error("Rename failed", err);
+    } finally {
+      setInlineRenamingId(null);
+    }
+  };
+
+  const handleInlineColorChange = async (folderId: number, color: string | null) => {
+    try {
+      await updateFolderColor(folderId, color);
+      await loadData(true);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const toggleSelection = (cid: string | number) => {
@@ -355,10 +384,116 @@ export default function FavoritesPage() {
       header: t("my_routes.table.name_col"),
       render: (item) => {
         const isFolder = item.type === "folder";
+        const itemId = `${item.type}-${item.id}`;
+        const isRenaming = inlineRenamingId === itemId;
+        const isColorEditing = inlineColorId === itemId && isFolder;
+
+        // ── Inline Rename Mode ──
+        if (isRenaming) {
+          return (
+            <div className="flex items-center gap-3 w-full" onClick={(e) => e.stopPropagation()}>
+              <div className={`flex-shrink-0 ${isFolder ? "text-primary" : "text-secondary"}`}>
+                {isFolder ? <FolderIcon size={20} color={(item as FavoriteFolder).color} /> : <HiOutlineLink size={20} />}
+              </div>
+              <input
+                autoFocus
+                value={inlineRenamingName}
+                onChange={(e) => setInlineRenamingName(e.target.value)}
+                className="px-2 py-1 bg-surface border border-primary rounded outline-none text-body-md text-on-surface font-semibold max-w-xs flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleInlineRenameSubmit(item);
+                  if (e.key === "Escape") setInlineRenamingId(null);
+                }}
+                onBlur={() => setTimeout(() => handleInlineRenameSubmit(item), 150)}
+              />
+            </div>
+          );
+        }
+
+        // ── Inline Color Editing Mode (folders only) ──
+        if (isColorEditing) {
+          const currentColor = (item as FavoriteFolder).color ?? null;
+          const selectedColor = pendingColor !== undefined ? pendingColor : currentColor;
+
+          return (
+            <div className="flex items-center gap-3 w-full" onClick={(e) => e.stopPropagation()}>
+              <div className="flex-shrink-0 text-primary">
+                <FolderIcon size={20} color={selectedColor} />
+              </div>
+              <span className="font-semibold text-body-md text-on-surface truncate mr-1">{item.name}</span>
+              <div className="flex items-center gap-1.5 bg-surface px-2 py-1 rounded border border-outline-variant/60 animate-in fade-in zoom-in-95 duration-150">
+                {[
+                  { value: null, class: "bg-primary border-primary", label: "Default" },
+                  { value: "#5c6370", class: "bg-[#5c6370] border-[#5c6370]", label: "Grey" },
+                  { value: "#6199a8", class: "bg-[#6199a8] border-[#6199a8]", label: "Teal" },
+                  { value: "#e5c07b", class: "bg-[#e5c07b] border-[#e5c07b]", label: "Gold" },
+                  { value: "#e06c75", class: "bg-[#e06c75] border-[#e06c75]", label: "Red" },
+                  { value: "#98c379", class: "bg-[#98c379] border-[#98c379]", label: "Green" },
+                  { value: "#c678dd", class: "bg-[#c678dd] border-[#c678dd]", label: "Violet" },
+                ].map((col) => {
+                  const isSelected = selectedColor === col.value;
+                  return (
+                    <button
+                      key={col.label}
+                      type="button"
+                      onClick={() => setPendingColor(col.value)}
+                      className={`w-4 h-4 rounded-full border transition-all hover:scale-125 cursor-pointer ${col.class}
+                        ${isSelected ? "ring-2 ring-offset-2 ring-primary scale-110" : "opacity-80 hover:opacity-100"}`}
+                      title={col.label}
+                    />
+                  );
+                })}
+                {/* Custom Color Rainbow Picker */}
+                <label
+                  className="relative w-4 h-4 rounded-full border border-outline-variant cursor-pointer flex items-center justify-center overflow-hidden bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 shadow-sm hover:scale-125 transition-transform"
+                  title="Custom color"
+                >
+                  <input
+                    type="color"
+                    value={selectedColor || "#a6c9f8"}
+                    onChange={(e) => setPendingColor(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  {selectedColor && !["#5c6370", "#6199a8", "#e5c07b", "#e06c75", "#98c379", "#c678dd"].includes(selectedColor) && (
+                    <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                  )}
+                </label>
+
+                {/* Confirm button */}
+                <button
+                  onClick={() => {
+                    if (pendingColor !== undefined) {
+                      handleInlineColorChange(item.id!, pendingColor);
+                    }
+                    setPendingColor(undefined);
+                    setInlineColorId(null);
+                  }}
+                  className="ml-1 p-0.5 text-primary hover:text-on-surface hover:bg-primary/20 rounded transition-colors cursor-pointer"
+                  title={t("my_routes.table.confirm_color", "Confirmar")}
+                >
+                  <HiOutlineCheck className="w-4 h-4" />
+                </button>
+                {/* Cancel button */}
+                <button
+                  onClick={() => {
+                    setPendingColor(undefined);
+                    setInlineColorId(null);
+                  }}
+                  className="p-0.5 text-on-surface-variant/60 hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
+                  title={t("my_routes.cancel_btn")}
+                >
+                  <HiOutlineX className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        // ── Default Mode ──
         return (
           <div className="flex items-center gap-3">
             <div className={`flex-shrink-0 transition-transform group-hover:scale-105 ${isFolder ? "text-primary" : "text-secondary"}`}>
-              {isFolder ? <HiOutlineFolder size={20} /> : <HiOutlineLink size={20} />}
+              {isFolder ? <FolderIcon size={20} color={(item as FavoriteFolder).color} /> : <HiOutlineLink size={20} />}
             </div>
             <div className="min-w-0">
               {isFolder ? (
@@ -414,74 +549,116 @@ export default function FavoritesPage() {
     {
       key: "actions",
       header: "",
-      className: "text-right",
-      render: (item) => (
-        <div
-          className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {item.type === "route" && (
-            <>
-              <button
-                onClick={() =>
-                  handleCopy(
-                    item.id!,
-                    `s3://${(item as Route).bucket}/${(item as Route).prefix}`,
-                  )
-                }
-                className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
-                title={t("my_routes.table.copy_uri_tooltip")}
-              >
-                {copiedId === item.id ? (
-                  <HiOutlineCheck className="w-4 h-4 text-primary" />
-                ) : (
-                  <HiOutlineDuplicate className="w-4 h-4" />
-                )}
-              </button>
-              <button
-                onClick={() => handleNavigate(item as Route)}
-                className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
-                title={t("my_routes.table.go_path_tooltip")}
-              >
-                <HiOutlineExternalLink className="w-4 h-4" />
-              </button>
-            </>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); setRenamingItem(item); }}
-            className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
-            title={t("my_routes.table.rename_tooltip")}
-          >
-            <HiOutlinePencil className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setMoveItems([item]); }}
-            className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
-            title={t("my_routes.table.move_tooltip")}
-          >
-            <HiOutlineSwitchHorizontal className="w-4 h-4" />
-          </button>
-          <button
-            onClick={async () => {
-              const msg = item.type === "folder"
-                ? t("my_routes.delete_folder_confirm", { name: item.name })
-                : t("my_routes.delete_route_confirm", { name: item.name });
-              const confirmed = await confirm(msg, { title: t("my_routes.title"), kind: "warning" });
-              if (confirmed) {
-                if (item.type === "folder") {
-                  removeFolder(item.id!).then(loadData);
-                } else {
-                  removeRoute(item.id!).then(loadData);
-                }
-              }
-            }}
-            className="p-1.5 bg-surface-container border border-outline-variant text-error/80 hover:text-error hover:bg-error-container/20 rounded transition-colors cursor-pointer"
-            title={t("my_routes.table.delete_tooltip")}
-          >
-            <HiOutlineTrash className="w-4 h-4" />
-          </button>
-        </div>
-      ),
+      className: "text-right overflow-visible",
+      render: (item) => {
+        const id = `${item.type}-${item.id}`;
+        const isMenuOpen = activeMenuId === id;
+        
+        return (
+          <div className="relative flex justify-end" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setActiveMenuId(isMenuOpen ? null : id)}
+              className="p-1.5 hover:bg-surface-container-highest rounded text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              title={t("my_routes.table.actions_tooltip", "Más acciones")}
+            >
+              <HiOutlineDotsVertical className="w-4 h-4" />
+            </button>
+            {isMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setActiveMenuId(null)}
+                />
+                <div className="absolute right-0 top-full mt-1 w-48 bg-surface-container-highest border border-outline-variant rounded-md shadow-2xl z-50 py-1 text-body-md text-left animate-in fade-in slide-in-from-top-1.5 duration-100 ease-out">
+                  {item.type === "route" && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleCopy(item.id!, `s3://${(item as Route).bucket}/${(item as Route).prefix}`);
+                        }}
+                        className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
+                      >
+                        {copiedId === item.id ? (
+                          <HiOutlineCheck className="w-4 h-4 text-primary" />
+                        ) : (
+                          <HiOutlineDuplicate className="w-4 h-4 text-on-surface-variant" />
+                        )}
+                        {t("my_routes.table.copy_uri_tooltip")}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          handleNavigate(item as Route);
+                        }}
+                        className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
+                      >
+                        <HiOutlineExternalLink className="w-4 h-4 text-on-surface-variant" />
+                        {t("my_routes.table.go_path_tooltip")}
+                      </button>
+                      <div className="border-t border-outline-variant/30 my-1" />
+                    </>
+                  )}
+                  <button
+                    onClick={() => {
+                      setActiveMenuId(null);
+                      setInlineRenamingId(id);
+                      setInlineRenamingName(item.name);
+                    }}
+                    className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
+                  >
+                    <HiOutlinePencil className="w-4 h-4 text-on-surface-variant" />
+                    {t("my_routes.table.rename_tooltip")}
+                  </button>
+                  {item.type === "folder" && (
+                    <button
+                      onClick={() => {
+                        setActiveMenuId(null);
+                        setInlineColorId(id);
+                      }}
+                      className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
+                    >
+                      <HiOutlineColorSwatch className="w-4 h-4 text-on-surface-variant" />
+                      {t("my_routes.table.change_color_tooltip", "Cambiar color")}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setActiveMenuId(null);
+                      setMoveItems([item]);
+                    }}
+                    className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
+                  >
+                    <HiOutlineSwitchHorizontal className="w-4 h-4 text-on-surface-variant" />
+                    {t("my_routes.table.move_tooltip")}
+                  </button>
+                  <div className="border-t border-outline-variant/30 my-1" />
+                  <button
+                    onClick={async () => {
+                      setActiveMenuId(null);
+                      const msg = item.type === "folder"
+                        ? t("my_routes.delete_folder_confirm", { name: item.name })
+                        : t("my_routes.delete_route_confirm", { name: item.name });
+                      const confirmed = await confirm(msg, { title: t("my_routes.title"), kind: "warning" });
+                      if (confirmed) {
+                        if (item.type === "folder") {
+                          removeFolder(item.id!).then(loadData);
+                        } else {
+                          removeRoute(item.id!).then(loadData);
+                        }
+                      }
+                    }}
+                    className="w-full px-4 py-2 hover:bg-error-container/20 hover:text-error flex items-center gap-2.5 text-error/80 text-left transition-colors cursor-pointer"
+                  >
+                    <HiOutlineTrash className="w-4 h-4" />
+                    {t("my_routes.table.delete_tooltip")}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -623,7 +800,7 @@ export default function FavoritesPage() {
             </div>
 
             {isAddingFolder && (
-              <div className="px-4 py-3 bg-surface-container border-b border-outline-variant flex items-center gap-3 animate-in slide-in-from-top-4">
+              <div className="px-4 py-3 bg-surface-container border-b border-outline-variant flex flex-col sm:flex-row sm:items-center gap-4 animate-in slide-in-from-top-4">
                 <input
                   autoFocus
                   value={newFolderName}
@@ -632,32 +809,89 @@ export default function FavoritesPage() {
                   className="flex-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded outline-none focus:border-primary text-body-md text-on-surface"
                   onKeyDown={(e) => {
                     if (e.key === "Enter")
-                      addFolder(newFolderName, currentFolderId).then(() => {
+                      addFolder(newFolderName, currentFolderId, newFolderColor).then(() => {
                         setNewFolderName("");
+                        setNewFolderColor(null);
                         setIsAddingFolder(false);
                         loadData();
                       });
-                    if (e.key === "Escape") setIsAddingFolder(false);
+                    if (e.key === "Escape") {
+                      setNewFolderColor(null);
+                      setIsAddingFolder(false);
+                    }
                   }}
                 />
-                <button
-                  onClick={() =>
-                    addFolder(newFolderName, currentFolderId).then(() => {
-                      setNewFolderName("");
+
+                {/* Color Selector */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-label-sm font-semibold text-on-surface-variant uppercase tracking-wider select-none mr-1">
+                    Color:
+                  </span>
+                  <div className="flex items-center gap-1.5 bg-surface-container-lowest px-2 py-1 rounded border border-outline-variant/60">
+                    {[
+                      { value: null, class: "bg-primary border-primary", label: "Default" },
+                      { value: "#5c6370", class: "bg-[#5c6370] border-[#5c6370]", label: "Grey" },
+                      { value: "#6199a8", class: "bg-[#6199a8] border-[#6199a8]", label: "Teal" },
+                      { value: "#e5c07b", class: "bg-[#e5c07b] border-[#e5c07b]", label: "Gold" },
+                      { value: "#e06c75", class: "bg-[#e06c75] border-[#e06c75]", label: "Red" },
+                      { value: "#98c379", class: "bg-[#98c379] border-[#98c379]", label: "Green" },
+                      { value: "#c678dd", class: "bg-[#c678dd] border-[#c678dd]", label: "Violet" },
+                    ].map((col) => {
+                      const isSelected = newFolderColor === col.value;
+                      return (
+                        <button
+                          key={col.label}
+                          type="button"
+                          onClick={() => setNewFolderColor(col.value)}
+                          className={`w-4 h-4 rounded-full border transition-all hover:scale-110 cursor-pointer ${col.class}
+                            ${isSelected ? "ring-2 ring-offset-2 ring-primary scale-110" : "opacity-80"}`}
+                          title={col.label}
+                        />
+                      );
+                    })}
+
+                    {/* Custom Color Rainbow Picker */}
+                    <label
+                      className="relative w-4 h-4 rounded-full border border-outline-variant cursor-pointer flex items-center justify-center overflow-hidden bg-gradient-to-tr from-red-500 via-green-500 to-blue-500 shadow-sm hover:scale-110 transition-transform"
+                      title="Custom color"
+                    >
+                      <input
+                        type="color"
+                        value={newFolderColor || "#a6c9f8"}
+                        onChange={(e) => setNewFolderColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                      {newFolderColor && !["#5c6370", "#6199a8", "#e5c07b", "#e06c75", "#98c379", "#c678dd"].includes(newFolderColor) && (
+                        <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() =>
+                      addFolder(newFolderName, currentFolderId, newFolderColor).then(() => {
+                        setNewFolderName("");
+                        setNewFolderColor(null);
+                        setIsAddingFolder(false);
+                        loadData();
+                      })
+                    }
+                    className="bg-primary text-on-primary px-4 py-1.5 rounded font-medium text-body-md hover:bg-primary/95 transition-colors cursor-pointer"
+                  >
+                    {t("my_routes.create_btn")}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNewFolderColor(null);
                       setIsAddingFolder(false);
-                      loadData();
-                    })
-                  }
-                  className="bg-primary text-on-primary px-4 py-1.5 rounded font-medium text-body-md hover:bg-primary/95 transition-colors cursor-pointer"
-                >
-                  {t("my_routes.create_btn")}
-                </button>
-                <button
-                  onClick={() => setIsAddingFolder(false)}
-                  className="px-3 py-1.5 text-on-surface-variant font-medium hover:bg-surface-container-high rounded text-body-md transition-colors cursor-pointer"
-                >
-                  {t("my_routes.cancel_btn")}
-                </button>
+                    }}
+                    className="px-3 py-1.5 text-on-surface-variant font-medium hover:bg-surface-container-high rounded text-body-md transition-colors cursor-pointer"
+                  >
+                    {t("my_routes.cancel_btn")}
+                  </button>
+                </div>
               </div>
             )}            <GenericTable
               items={displayItems}
@@ -707,21 +941,13 @@ export default function FavoritesPage() {
             onClose={() => setMoveItems([])}
           />
         )}
-
-        {renamingItem && (
-          <RenameModal
-            item={renamingItem}
-            onConfirm={handleRename}
-            onClose={() => setRenamingItem(null)}
-          />
-        )}
       </div>
 
       <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={dropAnimationConfig}>
         {overlayItem ? (
           <div className="flex items-center gap-3 px-3.5 py-2 w-fit max-w-xs bg-surface-container-high/90 border border-primary/30 text-on-surface rounded shadow-2xl backdrop-blur-md opacity-95 select-none pointer-events-none z-[9999] transform scale-105 border-l-2 border-l-primary font-medium animate-in fade-in zoom-in-95 duration-150 ease-out">
             <div className={`flex-shrink-0 ${overlayItem.type === "folder" ? "text-primary" : "text-secondary"}`}>
-              {overlayItem.type === "folder" ? <HiOutlineFolder size={18} /> : <HiOutlineLink size={18} />}
+              {overlayItem.type === "folder" ? <FolderIcon size={18} color={(overlayItem as FavoriteFolder).color} /> : <HiOutlineLink size={18} />}
             </div>
             <span className="font-semibold text-body-md truncate">{overlayItem.name}</span>
           </div>

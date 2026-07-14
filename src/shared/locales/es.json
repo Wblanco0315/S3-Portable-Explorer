@@ -300,7 +300,9 @@
       "go_path_tooltip": "Ir a la ruta",
       "delete_tooltip": "Eliminar",
       "move_tooltip": "Mover a carpeta",
-      "rename_tooltip": "Renombrar"
+      "rename_tooltip": "Cambiar nombre",
+      "change_color_tooltip": "Cambiar color",
+      "actions_tooltip": "Más acciones"
     },
     "move_btn": "Mover",
     "move_modal_title": "Mover '{{name}}' a...",

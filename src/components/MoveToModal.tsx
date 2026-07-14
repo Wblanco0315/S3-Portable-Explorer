@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import {
-  HiOutlineFolder,
-  HiOutlineFolderOpen,
   HiOutlineX,
   HiChevronRight,
   HiChevronDown,
 } from "react-icons/hi";
+import { FolderIcon } from "./FolderIcon";
 import { FavoriteFolder, Route } from "../features/favorites/favoritesStore";
 import { useTranslation } from "react-i18next";
 
@@ -89,12 +88,13 @@ function FolderRow({
             <span className="w-3 h-3" />
           )}
         </span>
-        <span className="flex-shrink-0">
-          {isSelected || isExpanded ? (
-            <HiOutlineFolderOpen className={`w-4 h-4 ${hasError ? "text-red-400" : ""}`} />
-          ) : (
-            <HiOutlineFolder className={`w-4 h-4 ${hasError ? "text-red-400" : ""}`} />
-          )}
+        <span className="flex-shrink-0 flex items-center justify-center">
+          <FolderIcon
+            size={16}
+            className={hasError ? "text-red-400" : ""}
+            color={node.color}
+            open={isSelected || isExpanded}
+          />
         </span>
         <span className="truncate flex-1">{node.name}</span>
         {isMoved && (
@@ -250,7 +250,7 @@ export function MoveToModal({
             `}
           >
             <span className="w-4 h-4 flex-shrink-0" />
-            <HiOutlineFolder className="w-4 h-4 flex-shrink-0" />
+            <FolderIcon size={16} className="flex-shrink-0" />
             <span className="font-medium">{t("my_routes.move_modal_root")}</span>
           </button>
 

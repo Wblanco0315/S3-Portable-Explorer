@@ -1,4 +1,5 @@
-import { HiOutlineFolder as HiFolderIcon, HiOutlineSelector } from "react-icons/hi";
+import { HiOutlineSelector } from "react-icons/hi";
+import { FolderIcon } from "./FolderIcon";
 import { HiOutlineArrowsUpDown } from "react-icons/hi2";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 
@@ -314,7 +315,7 @@ export function GenericTable<T>({
               <td colSpan={columns.length + (onSelectAll ? 1 : 0) + (dndEnabled ? 1 : 0)}>
                 <div className="py-24 text-center">
                   <div className="w-12 h-12 bg-surface-container text-on-surface-variant rounded flex items-center justify-center mx-auto mb-4 border border-outline-variant">
-                    {emptyIcon || <HiFolderIcon size={22} />}
+                    {emptyIcon || <FolderIcon size={22} />}
                   </div>
                   <h3 className="text-headline-md text-on-surface font-semibold">
                     {emptyMessage}

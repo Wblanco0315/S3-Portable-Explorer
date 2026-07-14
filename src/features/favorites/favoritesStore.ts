@@ -16,6 +16,7 @@ export interface FavoriteFolder {
     id?: number;
     name: string;
     parent_id?: number | null;
+    color?: string | null;
     created_at?: string;
 }
 
@@ -31,12 +32,19 @@ export const addRoute = async (route: Route) => {
     );
 };
 
-// Folder Operations
-export const addFolder = async (name: string, parentId: number | null = null) => {
+export const addFolder = async (name: string, parentId: number | null = null, color: string | null = null) => {
     const database = await getDb();
     return await database.execute(
-        "INSERT INTO favorite_folders (name, parent_id) VALUES ($1, $2)",
-        [name, parentId]
+        "INSERT INTO favorite_folders (name, parent_id, color) VALUES ($1, $2, $3)",
+        [name, parentId, color]
+    );
+};
+
+export const updateFolderColor = async (folderId: number, color: string | null) => {
+    const database = await getDb();
+    return await database.execute(
+        "UPDATE favorite_folders SET color = $1 WHERE id = $2",
+        [color, folderId]
     );
 };
 
@@ -222,8 +230,14 @@ export const renameRoute = async (routeId: number, name: string) => {
     );
 };
 
-export const renameFolder = async (folderId: number, name: string) => {
+export const renameFolder = async (folderId: number, name: string, color?: string | null) => {
     const database = await getDb();
+    if (color !== undefined) {
+        return await database.execute(
+            "UPDATE favorite_folders SET name = $1, color = $2 WHERE id = $3",
+            [name, color, folderId]
+        );
+    }
     return await database.execute(
         "UPDATE favorite_folders SET name = $1 WHERE id = $2",
         [name, folderId]

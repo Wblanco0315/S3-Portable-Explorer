@@ -300,7 +300,9 @@
       "go_path_tooltip": "Go to path",
       "delete_tooltip": "Delete",
       "move_tooltip": "Move to folder",
-      "rename_tooltip": "Rename"
+      "rename_tooltip": "Rename",
+      "change_color_tooltip": "Change color",
+      "actions_tooltip": "More actions"
     },
     "move_btn": "Move",
     "move_modal_title": "Move '{{name}}' to...",

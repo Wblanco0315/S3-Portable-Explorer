@@ -23,6 +23,7 @@ export const getDb = (): Promise<Database> => {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
           parent_id INTEGER,
+          color TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (parent_id) REFERENCES favorite_folders (id) ON DELETE CASCADE
         )
@@ -51,6 +52,9 @@ export const getDb = (): Promise<Database> => {
       } catch (e) {}
       try {
         await db.execute("ALTER TABLE favorites ADD COLUMN visit_count INTEGER DEFAULT 0");
+      } catch (e) {}
+      try {
+        await db.execute("ALTER TABLE favorite_folders ADD COLUMN color TEXT");
       } catch (e) {}
 
       // 5. Create stats tables

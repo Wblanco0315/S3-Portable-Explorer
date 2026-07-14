@@ -8,7 +8,6 @@ import {
   HiOutlineLogout,
   HiOutlineStar,
   HiOutlineRefresh,
-  HiOutlineFolder,
   HiOutlinePhotograph,
   HiOutlineCode,
   HiOutlineDocument,
@@ -19,6 +18,7 @@ import {
   HiOutlineSearch,
 } from "react-icons/hi";
 import { HiStar } from "react-icons/hi";
+import { FolderIcon } from "../components/FolderIcon";
 
 import {
   listBucketObjects,
@@ -83,7 +83,7 @@ const inferType = (key: string): string => {
 const getIconForType = (type: string) => {
   switch (type) {
     case "folder":
-      return <HiOutlineFolder className="text-primary" size={22} />;
+      return <FolderIcon className="text-primary" size={22} />;
     case "image":
       return <HiOutlinePhotograph className="text-tertiary" size={22} />;
     case "code":
@@ -624,7 +624,7 @@ export default function BucketExplorerPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-headline-lg font-bold text-on-surface tracking-tight flex items-center gap-2">
               <div className="p-1.5 bg-surface-container-high text-primary border border-outline-variant rounded">
-                <HiOutlineFolder size={20} />
+                <FolderIcon size={20} />
               </div>
               {currentPrefix.split("/").filter(Boolean).pop() || bucketName}
             </h1>
