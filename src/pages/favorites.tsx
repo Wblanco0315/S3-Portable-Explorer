@@ -38,8 +38,24 @@ import { MoveToModal } from "../components/MoveToModal";
 import { RenameModal } from "../components/RenameModal";
 import { useTranslation } from "react-i18next";
 import { safeConfirm as confirm } from "../shared/utils/dialog";
+import {
+  DndContext,
+  DragOverlay,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  DragStartEvent,
+  DragEndEvent,
+  pointerWithin,
+} from "@dnd-kit/core";
+import { snapCenterToCursor } from "@dnd-kit/modifiers";
 
 type Item = (Route & { type: "route" }) | (FavoriteFolder & { type: "folder" });
+
+const dropAnimationConfig = {
+  duration: 220,
+  easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+};
 
 export default function FavoritesPage() {
   const { navigateToRoute } = useRouteNavigator();
@@ -86,8 +102,103 @@ export default function FavoritesPage() {
   const [moveItems, setMoveItems] = useState<Item[]>([]);
   const [renamingItem, setRenamingItem] = useState<Item | null>(null);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const [draggedItem, setDraggedItem] = useState<Item | null>(null);
+  const [movingRowId, setMovingRowId] = useState<string | null>(null);
+  const [overlayItem, setOverlayItem] = useState<Item | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const isFolderDescendant = (ancestorId: number, targetId: number): boolean => {
+    let currId: number | null = targetId;
+    while (currId !== null) {
+      const f = folders.find((x) => x.id === currId);
+      if (!f) break;
+      if (f.parent_id === ancestorId) return true;
+      currId = f.parent_id ?? null;
+    }
+    return false;
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const item = active.data.current as Item;
+    if (item) {
+      setDraggedItem(item);
+      setOverlayItem(item);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setDraggedItem(null);
+    setTimeout(() => {
+      setOverlayItem(null);
+    }, 250);
+
+    if (!over) return;
+
+    const dragged = active.data.current as Item;
+    if (!dragged) return;
+
+    let targetFolderId: number | null = null;
+
+    if (over.id === "breadcrumb-root") {
+      targetFolderId = null;
+    } else if (typeof over.id === "string" && over.id.startsWith("breadcrumb-folder-")) {
+      targetFolderId = parseInt(over.id.replace("breadcrumb-folder-", ""));
+    } else if (typeof over.id === "string" && over.id.startsWith("drop-folder-")) {
+      // Over drop zone of a folder row
+      targetFolderId = parseInt(over.id.replace("drop-folder-", ""));
+    } else if (typeof over.id === "string" && over.id.startsWith("drop-route-")) {
+      // Over a route row, which is disabled as a drop zone (so this shouldn't normally fire, but just in case, ignore)
+      return;
+    } else {
+      return;
+    }
+
+    if (dragged.type === "folder" && dragged.id === targetFolderId) return;
+
+    if (dragged.type === "folder" && targetFolderId !== null) {
+      if (isFolderDescendant(dragged.id!, targetFolderId)) return;
+    }
+
+    const currentParentId =
+      dragged.type === "folder"
+        ? dragged.parent_id ?? null
+        : dragged.folder_id ?? null;
+    if (currentParentId === targetFolderId) return;
+
+    // Trigger row slide-out animation
+    const rowId = `${dragged.type}-${dragged.id}`;
+    setMovingRowId(rowId);
+
+    // Wait for the slide-out animation to complete (300ms) before updating DB and state
+    setTimeout(async () => {
+      try {
+        if (dragged.type === "folder") {
+          await updateFolderParent(dragged.id!, targetFolderId);
+        } else {
+          await updateRouteFolder(dragged.id!, targetFolderId);
+        }
+        await loadData(true);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setMovingRowId(null);
+      }
+    }, 300);
+  };
+
+
+  const loadData = async (silent?: boolean | any) => {
+    const isSilent = silent === true;
+    if (!isSilent) setIsLoading(true);
     try {
       const [favs, flds] = await Promise.all([listRoutes(), listFolders()]);
       setRoutes(favs);
@@ -95,7 +206,7 @@ export default function FavoritesPage() {
     } catch (err) {
       console.error(err);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
@@ -133,6 +244,47 @@ export default function FavoritesPage() {
     }
     return path;
   }, [folders, currentFolderId]);
+
+  const breadcrumbItems = useMemo(() => {
+    const isValidDrop = (targetFolderId: number | null): boolean => {
+      if (!draggedItem) return false;
+
+      const currentParentId =
+        draggedItem.type === "folder"
+          ? draggedItem.parent_id ?? null
+          : draggedItem.folder_id ?? null;
+      if (currentParentId === targetFolderId) return false;
+
+      if (draggedItem.type === "folder") {
+        if (draggedItem.id === targetFolderId) return false;
+        if (
+          targetFolderId !== null &&
+          isFolderDescendant(draggedItem.id!, targetFolderId)
+        )
+          return false;
+      }
+
+      return true;
+    };
+
+    return [
+      {
+        label: t("my_routes.title"),
+        onClick: () => setCurrentFolderId(null),
+        active: !currentFolderId,
+        dndId: "breadcrumb-root",
+        dndDisabled: !isValidDrop(null),
+      },
+      ...breadcrumbPath.map((f, idx) => ({
+        label: f.name,
+        onClick: () => setCurrentFolderId(f.id!),
+        active: idx === breadcrumbPath.length - 1,
+        dndId: `breadcrumb-folder-${f.id}`,
+        dndDisabled: !isValidDrop(f.id!),
+      })),
+    ];
+  }, [breadcrumbPath, currentFolderId, t, draggedItem, folders]);
+
 
   const handleMove = async (targetFolderId: number | null) => {
     if (moveItems.length === 0) return;
@@ -334,234 +486,247 @@ export default function FavoritesPage() {
   ];
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-surface p-6 animate-in fade-in duration-500 overflow-hidden">
-      <div className="w-full flex-1 flex flex-col gap-6 min-h-0">
-        <Breadcrumb
-          onBackClick={handleBackClick}
-          items={[
-            {
-              label: t("my_routes.title"),
-              onClick: () => setCurrentFolderId(null),
-              active: !currentFolderId,
-            },
-            ...breadcrumbPath.map((f, idx) => ({
-              label: f.name,
-              onClick: () => setCurrentFolderId(f.id!),
-              active: idx === breadcrumbPath.length - 1,
-            })),
-          ]}
-        />
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="flex-1 flex flex-col min-h-0 bg-surface p-6 animate-in fade-in duration-500 overflow-hidden">
+        <div className="w-full flex-1 flex flex-col gap-6 min-h-0">
+          <Breadcrumb
+            onBackClick={handleBackClick}
+            items={breadcrumbItems}
+            isDraggingActive={draggedItem !== null}
+            moveHereLabel={t("my_routes.table.move_here", "Mover aquí")}
+          />
 
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-surface-container-high text-primary border border-outline-variant rounded flex items-center justify-center">
-              <HiOutlineLink className="w-5 h-5" />
-            </div>
-            <h1 className="text-headline-lg font-bold text-on-surface">{t("my_routes.title")}</h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadData}
-              className="p-2 bg-surface-container border border-outline-variant text-on-surface rounded hover:bg-surface-container-high transition-colors cursor-pointer"
-              title={t("buckets.refresh")}
-            >
-              <HiOutlineRefresh className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleImport}
-              className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-body-md font-medium rounded hover:bg-surface-container-high transition-colors cursor-pointer"
-              title={t("my_routes.import_tooltip")}
-            >
-              <HiOutlineUpload className="w-4 h-4 text-on-surface-variant" /> {t("my_routes.import_btn")}
-            </button>
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-body-md font-medium rounded hover:bg-surface-container-high transition-colors cursor-pointer"
-              title={t("my_routes.export_tooltip")}
-            >
-              <HiOutlineDownload className="w-4 h-4 text-on-surface-variant" /> {t("my_routes.export_btn")}
-            </button>
-            <button
-              onClick={() => setIsAddingFolder(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-body-md font-medium rounded border border-transparent hover:bg-primary/95 transition-colors cursor-pointer"
-            >
-              <HiOutlineFolderAdd className="w-4 h-4" /> {t("my_routes.new_folder_btn")}
-            </button>
-          </div>
-        </div>
-
-        {/* Main Explorer Container */}
-        <div className="flex-1 min-h-0 bg-surface-container-low border border-outline-variant rounded-lg overflow-hidden flex flex-col">
-          <div className="px-4 py-3 bg-surface-container border-b border-outline-variant flex items-center justify-between gap-4 flex-wrap shrink-0">
-            <div className="flex items-center gap-4 flex-1 min-w-[300px]">
-              <div className="relative w-full max-w-md">
-                <HiOutlineSearch
-                  className="absolute left-3 top-2.5 text-on-surface-variant"
-                  size={16}
-                />
-                <input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={t("my_routes.search_placeholder")}
-                  className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary transition-all outline-none text-body-md text-on-surface"
-                />
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-surface-container-high text-primary border border-outline-variant rounded flex items-center justify-center">
+                <HiOutlineLink className="w-5 h-5" />
               </div>
-              {searchTerm.trim().toLowerCase().startsWith("s3://") && (
-                <button
-                  onClick={() => {
-                    let cleanUrl = searchTerm.trim().slice(5);
-                    const slashIndex = cleanUrl.indexOf("/");
-                    let bucket = "";
-                    let prefix = "";
-                    if (slashIndex === -1) {
-                      bucket = cleanUrl;
-                    } else {
-                      bucket = cleanUrl.slice(0, slashIndex);
-                      prefix = cleanUrl.slice(slashIndex + 1);
-                    }
-                    if (bucket) {
-                      try {
-                        bucket = decodeURIComponent(bucket);
-                        prefix = decodeURIComponent(prefix);
-                      } catch (e) {}
-                      navigate(`/buckets/${bucket}?prefix=${encodeURIComponent(prefix)}`);
-                      setSearchTerm("");
-                    }
-                  }}
-                  className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary/20 transition-all uppercase tracking-wider cursor-pointer animate-in slide-in-from-left-2"
-                >
-                  <HiOutlineDatabase size={14} /> {t("my_routes.go_to_s3_btn")}
-                </button>
-              )}
-              {selectedIds.size > 0 && (
-                <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
-                  <span className="text-label-sm font-semibold text-primary bg-primary-container/20 px-2 py-0.5 rounded-sm border border-primary-container/30 uppercase">
-                    {t("my_routes.selected_items", { count: selectedIds.size })}
-                  </span>
+              <h1 className="text-headline-lg font-bold text-on-surface">{t("my_routes.title")}</h1>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadData}
+                className="p-2 bg-surface-container border border-outline-variant text-on-surface rounded hover:bg-surface-container-high transition-colors cursor-pointer"
+                title={t("buckets.refresh")}
+              >
+                <HiOutlineRefresh className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleImport}
+                className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-body-md font-medium rounded hover:bg-surface-container-high transition-colors cursor-pointer"
+                title={t("my_routes.import_tooltip")}
+              >
+                <HiOutlineUpload className="w-4 h-4 text-on-surface-variant" /> {t("my_routes.import_btn")}
+              </button>
+              <button
+                onClick={handleExport}
+                className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant text-on-surface text-body-md font-medium rounded hover:bg-surface-container-high transition-colors cursor-pointer"
+                title={t("my_routes.export_tooltip")}
+              >
+                <HiOutlineDownload className="w-4 h-4 text-on-surface-variant" /> {t("my_routes.export_btn")}
+              </button>
+              <button
+                onClick={() => setIsAddingFolder(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-body-md font-medium rounded border border-transparent hover:bg-primary/95 transition-colors cursor-pointer"
+              >
+                <HiOutlineFolderAdd className="w-4 h-4" /> {t("my_routes.new_folder_btn")}
+              </button>
+            </div>
+          </div>
+
+          {/* Main Explorer Container */}
+          <div className="flex-1 min-h-0 bg-surface-container-low border border-outline-variant rounded-lg overflow-hidden flex flex-col">
+            <div className="px-4 py-3 bg-surface-container border-b border-outline-variant flex items-center justify-between gap-4 flex-wrap shrink-0">
+              <div className="flex items-center gap-4 flex-1 min-w-[300px]">
+                <div className="relative w-full max-w-md">
+                  <HiOutlineSearch
+                    className="absolute left-3 top-2.5 text-on-surface-variant"
+                    size={16}
+                  />
+                  <input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={t("my_routes.search_placeholder")}
+                    className="w-full pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant rounded focus:border-primary transition-all outline-none text-body-md text-on-surface"
+                  />
+                </div>
+                {searchTerm.trim().toLowerCase().startsWith("s3://") && (
                   <button
                     onClick={() => {
-                      const selected = displayItems.filter(item => selectedIds.has(`${item.type}-${item.id}`));
-                      setMoveItems(selected);
-                    }}
-                    className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary-container/35 transition-colors uppercase tracking-wider cursor-pointer"
-                    title={t("my_routes.move_btn")}
-                  >
-                    <HiOutlineSwitchHorizontal size={14} /> {t("my_routes.move_btn")}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      const confirmed = await confirm(
-                        t("my_routes.delete_confirm", { count: selectedIds.size }),
-                        { title: t("my_routes.title"), kind: "warning" }
-                      );
-                      if (!confirmed) return;
-                      for (const cid of selectedIds) {
-                        const [type, id] = cid.split("-");
-                        if (type === "folder") await removeFolder(parseInt(id));
-                        else await removeRoute(parseInt(id));
+                      let cleanUrl = searchTerm.trim().slice(5);
+                      const slashIndex = cleanUrl.indexOf("/");
+                      let bucket = "";
+                      let prefix = "";
+                      if (slashIndex === -1) {
+                        bucket = cleanUrl;
+                      } else {
+                        bucket = cleanUrl.slice(0, slashIndex);
+                        prefix = cleanUrl.slice(slashIndex + 1);
                       }
-                      setSelectedIds(new Set());
-                      loadData();
+                      if (bucket) {
+                        try {
+                          bucket = decodeURIComponent(bucket);
+                          prefix = decodeURIComponent(prefix);
+                        } catch (e) {}
+                        navigate(`/buckets/${bucket}?prefix=${encodeURIComponent(prefix)}`);
+                        setSearchTerm("");
+                      }
                     }}
-                    className="flex items-center gap-1.5 text-error text-label-sm font-semibold bg-error-container/20 px-3 py-1.5 rounded border border-error-container/30 hover:bg-error-container/30 transition-colors uppercase tracking-wider cursor-pointer"
-                    title={t("my_routes.delete_btn")}
+                    className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary/20 transition-all uppercase tracking-wider cursor-pointer animate-in slide-in-from-left-2"
                   >
-                    <HiOutlineTrash size={14} /> {t("my_routes.delete_btn")}
+                    <HiOutlineDatabase size={14} /> {t("my_routes.go_to_s3_btn")}
                   </button>
-                </div>
-              )}
+                )}
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center gap-2 animate-in slide-in-from-left-2">
+                    <span className="text-label-sm font-semibold text-primary bg-primary-container/20 px-2 py-0.5 rounded-sm border border-primary-container/30 uppercase">
+                      {t("my_routes.selected_items", { count: selectedIds.size })}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const selected = displayItems.filter(item => selectedIds.has(`${item.type}-${item.id}`));
+                        setMoveItems(selected);
+                      }}
+                      className="flex items-center gap-1.5 text-primary text-label-sm font-semibold bg-primary-container/20 px-3 py-1.5 rounded border border-primary-container/30 hover:bg-primary-container/35 transition-colors uppercase tracking-wider cursor-pointer"
+                      title={t("my_routes.move_btn")}
+                    >
+                      <HiOutlineSwitchHorizontal size={14} /> {t("my_routes.move_btn")}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const confirmed = await confirm(
+                          t("my_routes.delete_confirm", { count: selectedIds.size }),
+                          { title: t("my_routes.title"), kind: "warning" }
+                        );
+                        if (!confirmed) return;
+                        for (const cid of selectedIds) {
+                          const [type, id] = cid.split("-");
+                          if (type === "folder") await removeFolder(parseInt(id));
+                          else await removeRoute(parseInt(id));
+                        }
+                        setSelectedIds(new Set());
+                        loadData();
+                      }}
+                      className="flex items-center gap-1.5 text-error text-label-sm font-semibold bg-error-container/20 px-3 py-1.5 rounded border border-error-container/30 hover:bg-error-container/30 transition-colors uppercase tracking-wider cursor-pointer"
+                      title={t("my_routes.delete_btn")}
+                    >
+                      <HiOutlineTrash size={14} /> {t("my_routes.delete_btn")}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="text-label-sm font-semibold text-on-surface-variant uppercase tracking-wider">
+                {t("my_routes.items_count", { count: displayItems.length })}
+              </div>
             </div>
-            <div className="text-label-sm font-semibold text-on-surface-variant uppercase tracking-wider">
-              {t("my_routes.items_count", { count: displayItems.length })}
-            </div>
-          </div>
 
-          {isAddingFolder && (
-            <div className="px-4 py-3 bg-surface-container border-b border-outline-variant flex items-center gap-3 animate-in slide-in-from-top-4">
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder={t("my_routes.new_folder_placeholder")}
-                className="flex-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded outline-none focus:border-primary text-body-md text-on-surface"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter")
+            {isAddingFolder && (
+              <div className="px-4 py-3 bg-surface-container border-b border-outline-variant flex items-center gap-3 animate-in slide-in-from-top-4">
+                <input
+                  autoFocus
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder={t("my_routes.new_folder_placeholder")}
+                  className="flex-1 px-3 py-1.5 bg-surface-container-lowest border border-outline-variant rounded outline-none focus:border-primary text-body-md text-on-surface"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      addFolder(newFolderName, currentFolderId).then(() => {
+                        setNewFolderName("");
+                        setIsAddingFolder(false);
+                        loadData();
+                      });
+                    if (e.key === "Escape") setIsAddingFolder(false);
+                  }}
+                />
+                <button
+                  onClick={() =>
                     addFolder(newFolderName, currentFolderId).then(() => {
                       setNewFolderName("");
                       setIsAddingFolder(false);
                       loadData();
-                    });
-                  if (e.key === "Escape") setIsAddingFolder(false);
-                }}
-              />
-              <button
-                onClick={() =>
-                  addFolder(newFolderName, currentFolderId).then(() => {
-                    setNewFolderName("");
-                    setIsAddingFolder(false);
-                    loadData();
-                  })
-                }
-                className="bg-primary text-on-primary px-4 py-1.5 rounded font-medium text-body-md hover:bg-primary/95 transition-colors cursor-pointer"
-              >
-                {t("my_routes.create_btn")}
-              </button>
-              <button
-                onClick={() => setIsAddingFolder(false)}
-                className="px-3 py-1.5 text-on-surface-variant font-medium hover:bg-surface-container-high rounded text-body-md transition-colors cursor-pointer"
-              >
-                {t("my_routes.cancel_btn")}
-              </button>
-            </div>
-          )}
-
-          <GenericTable
-            items={displayItems}
-            columns={columns}
-            isLoading={isLoading}
-            rowKey={(item) => `${item.type}-${item.id}`}
-            onRowClick={(item) =>
-              item.type === "folder"
-                ? setCurrentFolderId(item.id!)
-                : handleNavigate(item as Route)
-            }
-            selectedIds={selectedIds}
-            onToggleSelection={toggleSelection}
-            onSelectAll={() => {
-              if (selectedIds.size === displayItems.length)
-                setSelectedIds(new Set());
-              else
-                setSelectedIds(
-                  new Set(displayItems.map((i) => `${i.type}-${i.id}`)),
+                    })
+                  }
+                  className="bg-primary text-on-primary px-4 py-1.5 rounded font-medium text-body-md hover:bg-primary/95 transition-colors cursor-pointer"
+                >
+                  {t("my_routes.create_btn")}
+                </button>
+                <button
+                  onClick={() => setIsAddingFolder(false)}
+                  className="px-3 py-1.5 text-on-surface-variant font-medium hover:bg-surface-container-high rounded text-body-md transition-colors cursor-pointer"
+                >
+                  {t("my_routes.cancel_btn")}
+                </button>
+              </div>
+            )}            <GenericTable
+              items={displayItems}
+              columns={columns}
+              isLoading={isLoading}
+              rowKey={(item) => `${item.type}-${item.id}`}
+              onRowClick={(item) =>
+                item.type === "folder"
+                  ? setCurrentFolderId(item.id!)
+                  : handleNavigate(item as Route)
+              }
+              dndEnabled={true}
+              draggedItem={draggedItem}
+              movingRowId={movingRowId}
+              moveHereLabel={t("my_routes.table.move_here", "Mover aquí")}
+              isValidDropTarget={(drag, target) => {
+                return (
+                  target.type === "folder" &&
+                  drag.id !== target.id &&
+                  (drag.type !== "folder" || !isFolderDescendant(drag.id!, target.id!))
                 );
-            }}
-            isAllSelected={
-              displayItems.length > 0 &&
-              selectedIds.size === displayItems.length
-            }
-            emptyMessage={t("my_routes.empty_message")}
-          />
+              }}
+              selectedIds={selectedIds}
+              onToggleSelection={toggleSelection}
+              onSelectAll={() => {
+                if (selectedIds.size === displayItems.length)
+                  setSelectedIds(new Set());
+                else
+                  setSelectedIds(
+                    new Set(displayItems.map((i) => `${i.type}-${i.id}`)),
+                  );
+              }}
+              isAllSelected={
+                displayItems.length > 0 &&
+                selectedIds.size === displayItems.length
+              }
+              emptyMessage={t("my_routes.empty_message")}
+            />
+          </div>
         </div>
+
+        {moveItems.length > 0 && (
+          <MoveToModal
+            moveItems={moveItems}
+            folders={folders}
+            onConfirm={handleMove}
+            onClose={() => setMoveItems([])}
+          />
+        )}
+
+        {renamingItem && (
+          <RenameModal
+            item={renamingItem}
+            onConfirm={handleRename}
+            onClose={() => setRenamingItem(null)}
+          />
+        )}
       </div>
 
-      {moveItems.length > 0 && (
-        <MoveToModal
-          moveItems={moveItems}
-          folders={folders}
-          onConfirm={handleMove}
-          onClose={() => setMoveItems([])}
-        />
-      )}
-
-      {renamingItem && (
-        <RenameModal
-          item={renamingItem}
-          onConfirm={handleRename}
-          onClose={() => setRenamingItem(null)}
-        />
-      )}
-    </div>
+      <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={dropAnimationConfig}>
+        {overlayItem ? (
+          <div className="flex items-center gap-3 px-3.5 py-2 w-fit max-w-xs bg-surface-container-high/90 border border-primary/30 text-on-surface rounded shadow-2xl backdrop-blur-md opacity-95 select-none pointer-events-none z-[9999] transform scale-105 border-l-2 border-l-primary font-medium animate-in fade-in zoom-in-95 duration-150 ease-out">
+            <div className={`flex-shrink-0 ${overlayItem.type === "folder" ? "text-primary" : "text-secondary"}`}>
+              {overlayItem.type === "folder" ? <HiOutlineFolder size={18} /> : <HiOutlineLink size={18} />}
+            </div>
+            <span className="font-semibold text-body-md truncate">{overlayItem.name}</span>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

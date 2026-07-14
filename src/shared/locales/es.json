@@ -295,6 +295,7 @@
       "folder_type": "Carpeta",
       "route_type": "Ruta",
       "drop_move": "Soltar para mover",
+      "move_here": "Mover aquí",
       "copy_uri_tooltip": "Copiar URI S3",
       "go_path_tooltip": "Ir a la ruta",
       "delete_tooltip": "Eliminar",

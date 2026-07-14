@@ -295,6 +295,7 @@
       "folder_type": "Folder",
       "route_type": "Route",
       "drop_move": "Drop to move",
+      "move_here": "Move here",
       "copy_uri_tooltip": "Copy S3 URI",
       "go_path_tooltip": "Go to path",
       "delete_tooltip": "Delete",

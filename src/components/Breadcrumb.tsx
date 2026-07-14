@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HiOutlineArrowLeft } from "react-icons/hi";
+import { useDroppable } from "@dnd-kit/core";
 
 export interface BreadcrumbItem {
     label: string;
@@ -12,6 +13,9 @@ export interface BreadcrumbItem {
     onDragLeave?: () => void;
     onDrop?: (e: React.DragEvent) => void;
     isDropTarget?: boolean;
+    // For @dnd-kit:
+    dndId?: string;
+    dndDisabled?: boolean;
 }
 
 interface BreadcrumbProps {
@@ -19,13 +23,57 @@ interface BreadcrumbProps {
     showBackButton?: boolean;
     onBackClick?: () => void;
     className?: string;
+    isDraggingActive?: boolean;
+    moveHereLabel?: string;
 }
+
+interface BreadcrumbSegmentProps {
+    item: BreadcrumbItem;
+    idx: number;
+    isDraggingActive?: boolean;
+    moveHereLabel?: string;
+}
+
+const BreadcrumbSegment: React.FC<BreadcrumbSegmentProps> = ({ item, idx, isDraggingActive, moveHereLabel }) => {
+    const { setNodeRef, isOver } = useDroppable({
+        id: item.dndId || `breadcrumb-dummy-${idx}`,
+        disabled: !item.dndId || item.dndDisabled,
+    });
+
+    const isHighlight = item.isDropTarget || isOver;
+    const showDropZoneCue = isDraggingActive && !item.dndDisabled;
+
+    return (
+        <span className="relative inline-block">
+            <span
+                ref={item.dndId ? setNodeRef : undefined}
+                onClick={item.dndDisabled ? undefined : item.onClick}
+                className={`cursor-pointer px-1.5 py-0.5 rounded border border-transparent transition-all duration-200 ease-in-out
+                    ${item.active ? 'text-primary bg-surface-container-high border-outline-variant font-bold' : 'hover:bg-surface-container-highest/50 hover:text-on-surface'}
+                    ${isHighlight ? 'bg-primary/20 text-primary border border-primary font-bold scale-[1.03]' : ''}
+                    ${showDropZoneCue && !isHighlight ? 'border-dashed border-primary bg-primary/5' : ''}
+                    ${isDraggingActive && item.dndDisabled ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}
+                `}
+            >
+                {item.label}
+            </span>
+            {isOver && moveHereLabel && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 bg-primary text-on-primary text-[10px] font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap animate-in fade-in zoom-in-95 duration-100 z-50 pointer-events-none uppercase tracking-wider font-mono">
+                    {moveHereLabel}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-primary" />
+                </div>
+            )}
+        </span>
+    );
+};
 
 export const Breadcrumb: React.FC<BreadcrumbProps> = ({ 
     items, 
     showBackButton = true, 
     onBackClick,
-    className = "" 
+    className = "",
+    isDraggingActive,
+    moveHereLabel
 }) => {
     const navigate = useNavigate();
 
@@ -76,6 +124,8 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                             >
                                 {item.label}
                             </Link>
+                        ) : item.dndId ? (
+                            <BreadcrumbSegment item={item} idx={idx} isDraggingActive={isDraggingActive} moveHereLabel={moveHereLabel} />
                         ) : (
                             <span
                                 onClick={item.onClick}
