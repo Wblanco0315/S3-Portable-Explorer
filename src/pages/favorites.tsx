@@ -14,6 +14,7 @@ import {
   HiOutlineUpload,
   HiOutlineDatabase,
   HiOutlineSwitchHorizontal,
+  HiOutlinePencil,
 } from "react-icons/hi";
 import {
   listRoutes,
@@ -27,11 +28,14 @@ import {
   updateFolderParent,
   exportFavorites,
   importFavorites,
+  renameRoute,
+  renameFolder,
 } from "../features/favorites/favoritesStore";
 import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { MoveToModal } from "../components/MoveToModal";
+import { RenameModal } from "../components/RenameModal";
 import { useTranslation } from "react-i18next";
 import { safeConfirm as confirm } from "../shared/utils/dialog";
 
@@ -80,6 +84,7 @@ export default function FavoritesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [moveItems, setMoveItems] = useState<Item[]>([]);
+  const [renamingItem, setRenamingItem] = useState<Item | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -139,6 +144,16 @@ export default function FavoritesPage() {
       }
     }
     setSelectedIds(new Set());
+    await loadData();
+  };
+
+  const handleRename = async (newName: string) => {
+    if (!renamingItem) return;
+    if (renamingItem.type === "folder") {
+      await renameFolder(renamingItem.id!, newName);
+    } else {
+      await renameRoute(renamingItem.id!, newName);
+    }
     await loadData();
   };
 
@@ -280,6 +295,13 @@ export default function FavoritesPage() {
               </button>
             </>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setRenamingItem(item); }}
+            className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
+            title={t("my_routes.table.rename_tooltip")}
+          >
+            <HiOutlinePencil className="w-4 h-4" />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); setMoveItems([item]); }}
             className="p-1.5 bg-surface-container border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded transition-colors cursor-pointer"
@@ -530,6 +552,14 @@ export default function FavoritesPage() {
           folders={folders}
           onConfirm={handleMove}
           onClose={() => setMoveItems([])}
+        />
+      )}
+
+      {renamingItem && (
+        <RenameModal
+          item={renamingItem}
+          onConfirm={handleRename}
+          onClose={() => setRenamingItem(null)}
         />
       )}
     </div>

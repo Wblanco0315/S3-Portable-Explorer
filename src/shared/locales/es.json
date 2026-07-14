@@ -271,6 +271,10 @@
     "new_folder_placeholder": "Nombre de la carpeta",
     "create_btn": "Crear",
     "cancel_btn": "Cancelar",
+    "rename_btn": "Renombrar",
+    "rename_modal_title": "Renombrar '{{name}}'",
+    "rename_modal_placeholder": "Nuevo nombre",
+    "rename_error_empty": "El nombre no puede estar vacío.",
     "selected_items": "{{count}} seleccionados",
     "delete_btn": "Eliminar",
     "items_count": "{{count}} ítems",
@@ -294,7 +298,8 @@
       "copy_uri_tooltip": "Copiar URI S3",
       "go_path_tooltip": "Ir a la ruta",
       "delete_tooltip": "Eliminar",
-      "move_tooltip": "Mover a carpeta"
+      "move_tooltip": "Mover a carpeta",
+      "rename_tooltip": "Renombrar"
     },
     "move_btn": "Mover",
     "move_modal_title": "Mover '{{name}}' a...",

@@ -19,7 +19,8 @@ import {
   isAwsAuthenticated,
   getAwsAccountDisplayName,
 } from "../features/aws/s3Client";
-import { getLocalSSOCredentials } from "../features/aws/awsCli";
+import { getLocalSSOCredentials, listAwsProfiles, openTerminalForSSO, triggerSSOLogin } from "../features/aws/awsCli";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { useDatabase } from "../shared/hooks/useDatabase";
@@ -260,20 +261,18 @@ export default function BucketPage() {
   // Mount effects
   useEffect(() => {
     // 1. Fetch CLI profiles (if any exist)
-    import("../features/aws/awsCli").then(({ listAwsProfiles }) => {
-      listAwsProfiles().then((profiles) => {
-        if (profiles.length > 0) {
-          setAvailableProfiles(profiles);
-          const activeStoredProfile = localStorage.getItem("aws_sso_profile") || "default";
-          if (profiles.includes(activeStoredProfile)) {
-            setProfile(activeStoredProfile);
-          } else if (profiles.includes("default")) {
-            setProfile("default");
-          } else {
-            setProfile(profiles[0]);
-          }
+    listAwsProfiles().then((profiles) => {
+      if (profiles.length > 0) {
+        setAvailableProfiles(profiles);
+        const activeStoredProfile = localStorage.getItem("aws_sso_profile") || "default";
+        if (profiles.includes(activeStoredProfile)) {
+          setProfile(activeStoredProfile);
+        } else if (profiles.includes("default")) {
+          setProfile("default");
+        } else {
+          setProfile(profiles[0]);
         }
-      });
+      }
     });
 
     // 2. Fetch corporate settings from DB
@@ -431,7 +430,6 @@ export default function BucketPage() {
 
       // Open dynamic browser via Tauri opener
       try {
-        const { openUrl } = await import("@tauri-apps/plugin-opener");
         await openUrl(auth.verificationUriComplete);
         setSsoStatusMessage(t("buckets.browser_opened_confirm"));
       } catch (openErr) {
@@ -947,7 +945,6 @@ export default function BucketPage() {
                             onClick={async () => {
                               if (!profile) return;
                               try {
-                                const { openTerminalForSSO } = await import("../features/aws/awsCli");
                                 await openTerminalForSSO(profile);
                                 setError(t("buckets.console_opened_msg", { profile }));
                                 setIsCreatingProfile(false);
@@ -997,7 +994,6 @@ export default function BucketPage() {
                           type="button"
                           onClick={async () => {
                             try {
-                              const { openTerminalForSSO } = await import("../features/aws/awsCli");
                               await openTerminalForSSO(profile);
                               setSsoNeedsConfig(false);
                               setError(t("buckets.console_opened_msg", { profile }));
@@ -1027,7 +1023,6 @@ export default function BucketPage() {
                             setIsLoading(true);
                             setError("");
                             try {
-                              const { triggerSSOLogin } = await import("../features/aws/awsCli");
                               await triggerSSOLogin(profile);
                               setSsoNeedsLogin(false);
                               setError(t("buckets.sso_logged_in_msg"));

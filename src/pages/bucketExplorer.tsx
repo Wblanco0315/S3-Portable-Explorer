@@ -37,7 +37,7 @@ import {
   FavoriteFolder,
   removeRoute,
 } from "../features/favorites/favoritesStore";
-import { getLocalSSOCredentials } from "../features/aws/awsCli";
+import { getLocalSSOCredentials, triggerSSOLogin } from "../features/aws/awsCli";
 import { useDownloadStore } from "../features/downloads/downloadStore";
 import { useDatabase } from "../shared/hooks/useDatabase";
 import { recordBucketVisit, recordRouteVisit } from "../features/statistics/statisticsDatabase";
@@ -690,7 +690,6 @@ export default function BucketExplorerPage() {
                       setIsLoading(true);
                       setError(null);
                       try {
-                        const { triggerSSOLogin } = await import("../features/aws/awsCli");
                         await triggerSSOLogin(expiredProfile || "default");
                         setSsoNeedsLogin(false);
                         setExpiredProfile(null);

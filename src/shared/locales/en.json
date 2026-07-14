@@ -271,6 +271,10 @@
     "new_folder_placeholder": "Folder name",
     "create_btn": "Create",
     "cancel_btn": "Cancel",
+    "rename_btn": "Rename",
+    "rename_modal_title": "Rename '{{name}}'",
+    "rename_modal_placeholder": "New name",
+    "rename_error_empty": "Name cannot be empty.",
     "selected_items": "{{count}} selected",
     "delete_btn": "Delete",
     "items_count": "{{count}} items",
@@ -294,7 +298,8 @@
       "copy_uri_tooltip": "Copy S3 URI",
       "go_path_tooltip": "Go to path",
       "delete_tooltip": "Delete",
-      "move_tooltip": "Move to folder"
+      "move_tooltip": "Move to folder",
+      "rename_tooltip": "Rename"
     },
     "move_btn": "Move",
     "move_modal_title": "Move '{{name}}' to...",

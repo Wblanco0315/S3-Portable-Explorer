@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HiOutlineClipboardCopy, HiOutlineCheck, HiOutlineExternalLink } from 'react-icons/hi';
 import { S3Object } from '../types';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,15 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setGeneratedUrl(null);
+            setExpiresIn(3600);
+            setIsGenerating(false);
+            setCopied(false);
+        }
+    }, [isOpen, object]);
 
     if (!isOpen || !object) return null;
 

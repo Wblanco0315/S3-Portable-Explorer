@@ -213,3 +213,20 @@ export const importFavorites = async (): Promise<boolean> => {
   await importItemTree(data.item, null);
   return true;
 };
+
+export const renameRoute = async (routeId: number, name: string) => {
+    const database = await getDb();
+    return await database.execute(
+        "UPDATE favorites SET name = $1 WHERE id = $2",
+        [name, routeId]
+    );
+};
+
+export const renameFolder = async (folderId: number, name: string) => {
+    const database = await getDb();
+    return await database.execute(
+        "UPDATE favorite_folders SET name = $1 WHERE id = $2",
+        [name, folderId]
+    );
+};
+
