@@ -201,7 +201,9 @@
       "select_files_title": "Selecciona archivos para subir",
       "queued": "En cola",
       "add_routes_title": "Añadir a Mis Rutas",
-      "remove_routes_title": "Eliminar de Mis Rutas"
+      "remove_routes_title": "Eliminar de Mis Rutas",
+      "actions_tooltip": "Más acciones",
+      "share_btn": "Compartir"
     },
     "favorite_modal": {
       "title": "Guardar en Mis Rutas",

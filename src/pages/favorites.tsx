@@ -14,7 +14,6 @@ import {
   HiOutlineDatabase,
   HiOutlineSwitchHorizontal,
   HiOutlinePencil,
-  HiOutlineDotsVertical,
   HiOutlineColorSwatch,
   HiOutlineX,
 } from "react-icons/hi";
@@ -39,6 +38,7 @@ import { useRouteNavigator } from "../shared/hooks/useRouteNavigator";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
 import { MoveToModal } from "../components/MoveToModal";
+import { ActionMenu, ActionMenuItem } from "../components/ActionMenu";
 import { useTranslation } from "react-i18next";
 import { safeConfirm as confirm } from "../shared/utils/dialog";
 import {
@@ -378,6 +378,72 @@ export default function FavoritesPage() {
     }
   };
 
+  const getItemActionItems = (item: Item): ActionMenuItem[] => {
+    const id = `${item.type}-${item.id}`;
+    const isRoute = item.type === "route";
+    const isFolder = item.type === "folder";
+
+    return [
+      {
+        hidden: !isRoute,
+        icon:
+          copiedId === item.id ? (
+            <HiOutlineCheck className="w-4 h-4 text-primary" />
+          ) : (
+            <HiOutlineDuplicate className="w-4 h-4 text-on-surface-variant" />
+          ),
+        label: t("my_routes.table.copy_uri_tooltip"),
+        onClick: () =>
+          handleCopy(item.id!, `s3://${(item as Route).bucket}/${(item as Route).prefix}`),
+      },
+      {
+        hidden: !isRoute,
+        icon: <HiOutlineExternalLink className="w-4 h-4 text-on-surface-variant" />,
+        label: t("my_routes.table.go_path_tooltip"),
+        onClick: () => handleNavigate(item as Route),
+      },
+      {
+        separatorBefore: isRoute,
+        icon: <HiOutlinePencil className="w-4 h-4 text-on-surface-variant" />,
+        label: t("my_routes.table.rename_tooltip"),
+        onClick: () => {
+          setInlineRenamingId(id);
+          setInlineRenamingName(item.name);
+        },
+      },
+      {
+        hidden: !isFolder,
+        icon: <HiOutlineColorSwatch className="w-4 h-4 text-on-surface-variant" />,
+        label: t("my_routes.table.change_color_tooltip", "Cambiar color"),
+        onClick: () => setInlineColorId(id),
+      },
+      {
+        icon: <HiOutlineSwitchHorizontal className="w-4 h-4 text-on-surface-variant" />,
+        label: t("my_routes.table.move_tooltip"),
+        onClick: () => setMoveItems([item]),
+      },
+      {
+        separatorBefore: true,
+        danger: true,
+        icon: <HiOutlineTrash className="w-4 h-4" />,
+        label: t("my_routes.table.delete_tooltip"),
+        onClick: async () => {
+          const msg = isFolder
+            ? t("my_routes.delete_folder_confirm", { name: item.name })
+            : t("my_routes.delete_route_confirm", { name: item.name });
+          const confirmed = await confirm(msg, { title: t("my_routes.title"), kind: "warning" });
+          if (confirmed) {
+            if (isFolder) {
+              removeFolder(item.id!).then(loadData);
+            } else {
+              removeRoute(item.id!).then(loadData);
+            }
+          }
+        },
+      },
+    ];
+  };
+
   const columns: Column<Item>[] = [
     {
       key: "name",
@@ -552,111 +618,13 @@ export default function FavoritesPage() {
       className: "text-right overflow-visible",
       render: (item) => {
         const id = `${item.type}-${item.id}`;
-        const isMenuOpen = activeMenuId === id;
-        
         return (
-          <div className="relative flex justify-end" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setActiveMenuId(isMenuOpen ? null : id)}
-              className="p-1.5 hover:bg-surface-container-highest rounded text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
-              title={t("my_routes.table.actions_tooltip", "Más acciones")}
-            >
-              <HiOutlineDotsVertical className="w-4 h-4" />
-            </button>
-            {isMenuOpen && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setActiveMenuId(null)}
-                />
-                <div className="absolute right-0 top-full mt-1 w-48 bg-surface-container-highest border border-outline-variant rounded-md shadow-2xl z-50 py-1 text-body-md text-left animate-in fade-in slide-in-from-top-1.5 duration-100 ease-out">
-                  {item.type === "route" && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setActiveMenuId(null);
-                          handleCopy(item.id!, `s3://${(item as Route).bucket}/${(item as Route).prefix}`);
-                        }}
-                        className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
-                      >
-                        {copiedId === item.id ? (
-                          <HiOutlineCheck className="w-4 h-4 text-primary" />
-                        ) : (
-                          <HiOutlineDuplicate className="w-4 h-4 text-on-surface-variant" />
-                        )}
-                        {t("my_routes.table.copy_uri_tooltip")}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setActiveMenuId(null);
-                          handleNavigate(item as Route);
-                        }}
-                        className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
-                      >
-                        <HiOutlineExternalLink className="w-4 h-4 text-on-surface-variant" />
-                        {t("my_routes.table.go_path_tooltip")}
-                      </button>
-                      <div className="border-t border-outline-variant/30 my-1" />
-                    </>
-                  )}
-                  <button
-                    onClick={() => {
-                      setActiveMenuId(null);
-                      setInlineRenamingId(id);
-                      setInlineRenamingName(item.name);
-                    }}
-                    className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
-                  >
-                    <HiOutlinePencil className="w-4 h-4 text-on-surface-variant" />
-                    {t("my_routes.table.rename_tooltip")}
-                  </button>
-                  {item.type === "folder" && (
-                    <button
-                      onClick={() => {
-                        setActiveMenuId(null);
-                        setInlineColorId(id);
-                      }}
-                      className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
-                    >
-                      <HiOutlineColorSwatch className="w-4 h-4 text-on-surface-variant" />
-                      {t("my_routes.table.change_color_tooltip", "Cambiar color")}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setActiveMenuId(null);
-                      setMoveItems([item]);
-                    }}
-                    className="w-full px-4 py-2 hover:bg-surface-container flex items-center gap-2.5 text-on-surface text-left transition-colors cursor-pointer"
-                  >
-                    <HiOutlineSwitchHorizontal className="w-4 h-4 text-on-surface-variant" />
-                    {t("my_routes.table.move_tooltip")}
-                  </button>
-                  <div className="border-t border-outline-variant/30 my-1" />
-                  <button
-                    onClick={async () => {
-                      setActiveMenuId(null);
-                      const msg = item.type === "folder"
-                        ? t("my_routes.delete_folder_confirm", { name: item.name })
-                        : t("my_routes.delete_route_confirm", { name: item.name });
-                      const confirmed = await confirm(msg, { title: t("my_routes.title"), kind: "warning" });
-                      if (confirmed) {
-                        if (item.type === "folder") {
-                          removeFolder(item.id!).then(loadData);
-                        } else {
-                          removeRoute(item.id!).then(loadData);
-                        }
-                      }
-                    }}
-                    className="w-full px-4 py-2 hover:bg-error-container/20 hover:text-error flex items-center gap-2.5 text-error/80 text-left transition-colors cursor-pointer"
-                  >
-                    <HiOutlineTrash className="w-4 h-4" />
-                    {t("my_routes.table.delete_tooltip")}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <ActionMenu
+            tooltip={t("my_routes.table.actions_tooltip", "Más acciones")}
+            isOpen={activeMenuId === id}
+            onOpenChange={(open) => setActiveMenuId(open ? id : null)}
+            items={getItemActionItems(item)}
+          />
         );
       },
     },

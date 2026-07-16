@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>S3 Portable Explorer</title>
   <script>
-    (function() {
+    (function () {
       const saved = localStorage.getItem("theme");
       const theme = (saved === "light" || saved === "dark")
         ? saved
@@ -26,22 +26,18 @@
     <style>
       :root {
         --splash-bg: #f8f9ff;
-        --splash-logo-bg: #eef4ff;
-        --splash-logo-border: rgba(51, 83, 119, 0.2);
-        --splash-icon: #335377;
         --splash-text: #161c24;
-        --splash-progress-bg: #c3c6cf;
-        --splash-progress-fill: #335377;
+        --splash-subtext: #43474e;
+        --splash-loader-front: #335377;
+        --splash-loader-base: rgba(51, 83, 119, 0.8);
       }
 
       html.dark {
         --splash-bg: #0d131e;
-        --splash-logo-bg: #161c27;
-        --splash-logo-border: rgba(166, 201, 248, 0.2);
-        --splash-icon: #a6c9f8;
         --splash-text: #dde2f2;
-        --splash-progress-bg: #2f3541;
-        --splash-progress-fill: #a6c9f8;
+        --splash-subtext: #c3c6cf;
+        --splash-loader-front: #a6c9f8;
+        --splash-loader-base: rgba(166, 201, 248, 0.8);
       }
 
       body {
@@ -63,78 +59,141 @@
         z-index: 9999;
       }
 
-      .logo-box {
-        width: 56px;
-        height: 56px;
-        background-color: var(--splash-logo-bg);
-        border: 1px solid var(--splash-logo-border);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .database-icon {
-        width: 24px;
-        height: 24px;
-        color: var(--splash-icon);
-      }
-
       .splash-title {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        font-size: 14px;
-        font-weight: 500;
-        margin-top: 20px;
+        font-size: 15px;
+        font-weight: 600;
+        margin-top: 22px;
         color: var(--splash-text);
         letter-spacing: -0.01em;
       }
 
-      .progress-bar-container {
-        width: 160px;
-        height: 2px;
-        background-color: var(--splash-progress-bg);
+      .splash-subtitle {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 11px;
+        font-weight: 500;
+        margin-top: 6px;
+        color: var(--splash-subtext);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0.85;
+        transition: opacity 0.4s ease;
+        min-height: 1em;
+      }
+
+      /* Premium cloud loader (pure CSS, no framework — keeps the splash light).
+         Two cloud silhouettes drift diagonally apart and back together. */
+      .premium-loader {
+        --size: 2px;
+        --cloud: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z'/%3E%3C/svg%3E") center / contain no-repeat;
+        width: calc(64 * var(--size));
+        height: calc(64 * var(--size));
         position: relative;
-        overflow: hidden;
-        border-radius: 1px;
-        margin-top: 16px;
+        margin-top: 32px;
       }
 
-      .progress-bar-fill {
+      /* Three individually masked cloud layers; the parent is unmasked so the
+         sliding layers are not clipped to the base silhouette. */
+      .premium-loader .cloud-base,
+      .premium-loader::before,
+      .premium-loader::after {
+        content: "";
         position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 35%;
-        background-color: var(--splash-progress-fill);
-        animation: loading-slide 1.5s ease-in-out infinite;
-        border-radius: 1px;
+        inset: 0;
+        -webkit-mask: var(--cloud);
+        mask: var(--cloud);
       }
 
-      @keyframes loading-slide {
-        0% {
-          left: -35%;
+      .premium-loader .cloud-base {
+        background: var(--splash-loader-base);
+        z-index: 1;
+      }
+
+      .premium-loader::before {
+        background: var(--splash-loader-front);
+        opacity: 0.5;
+        z-index: 2;
+        animation: cloud-slide 1s infinite linear alternate;
+      }
+
+      .premium-loader::after {
+        background: var(--splash-loader-front);
+        opacity: 1;
+        z-index: 3;
+        animation: cloud-slide2 1s infinite linear alternate;
+      }
+
+      @keyframes cloud-slide {
+
+        0%,
+        20% {
+          transform: translate(0, 0);
         }
 
+        80%,
         100% {
-          left: 100%;
+          transform: translate(calc(15 * var(--size)), calc(9 * var(--size)));
+        }
+      }
+
+      @keyframes cloud-slide2 {
+
+        0%,
+        20% {
+          transform: translate(0, 0);
+        }
+
+        80%,
+        100% {
+          transform: translate(calc(-15 * var(--size)), calc(-9 * var(--size)));
         }
       }
     </style>
     <div class="splash-container">
-      <div class="logo-box">
-        <svg class="database-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-          <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
-          <path d="M3 12A9 3 0 0 0 21 12"></path>
-        </svg>
+      <div class="premium-loader">
+        <div class="cloud-base"></div>
       </div>
-      <div class="splash-title">Initializing S3 Explorer...</div>
-      <div class="progress-bar-container">
-        <div class="progress-bar-fill"></div>
-      </div>
+      <div class="splash-title">S3 Portable Explorer</div>
+      <div class="splash-subtitle" id="splash-subtitle">Initializing...</div>
     </div>
   </div>
+  <script>
+    (function () {
+      var lang = (localStorage.getItem("i18nextLng") || navigator.language || "en").toLowerCase();
+      var isEs = lang.indexOf("es") === 0;
+      var phrases = isEs
+        ? [
+            "Inicializando...",
+            "Conectando con AWS...",
+            "Asegurando tu sesión...",
+            "Preparando tus buckets...",
+            "Casi listo...",
+          ]
+        : [
+            "Initializing...",
+            "Connecting to AWS...",
+            "Securing your session...",
+            "Preparing your buckets...",
+            "Almost ready...",
+          ];
+      var el = document.getElementById("splash-subtitle");
+      if (!el) return;
+      var i = 0;
+      el.textContent = phrases[0];
+      var timer = setInterval(function () {
+        if (!el.isConnected) {
+          clearInterval(timer);
+          return;
+        }
+        el.style.opacity = "0";
+        setTimeout(function () {
+          i = (i + 1) % phrases.length;
+          el.textContent = phrases[i];
+          el.style.opacity = "0.85";
+        }, 400);
+      }, 2200);
+    })();
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

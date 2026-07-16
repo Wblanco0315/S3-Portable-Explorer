@@ -49,6 +49,7 @@ import { ShareModal } from "../features/explorer/components/ShareModal";
 import { S3Object, SortKey, SortConfig } from "../features/explorer/types";
 import { GenericTable, Column } from "../components/GenericTable";
 import { Breadcrumb } from "../components/Breadcrumb";
+import { ActionMenu, ActionMenuItem } from "../components/ActionMenu";
 
 const formatSize = (bytes?: number): string => {
   if (bytes === undefined || bytes === 0) return "-";
@@ -118,6 +119,7 @@ export default function BucketExplorerPage() {
     direction: "asc",
   });
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   // Favorites states
   const [isFavorite, setIsFavorite] = useState(false);
@@ -278,7 +280,7 @@ export default function BucketExplorerPage() {
         if (currentRoute && currentRoute.profile !== getCurrentActiveProfile()) {
           console.log(`Swapping profile to: ${currentRoute.profile}`);
           setIsLoading(true);
-          
+
           if (currentRoute.profile.startsWith("sso-native-")) {
             const targetAccountId = currentRoute.profile.replace("sso-native-", "");
             const storedToken = localStorage.getItem("aws_sso_token");
@@ -346,7 +348,7 @@ export default function BucketExplorerPage() {
       await fetchObjects();
       await checkIsFavorite();
       await loadFolders();
-      
+
       // Log visit action
       logAction("visit", `Visited s3://${bucketName}/${currentPrefix}`);
 
@@ -472,6 +474,19 @@ export default function BucketExplorerPage() {
     navigate("/buckets", { replace: true });
   };
 
+  const getObjectActionItems = (obj: S3Object): ActionMenuItem[] => [
+    {
+      icon: <HiOutlineDownload className="w-4 h-4 text-on-surface-variant" />,
+      label: t("buckets.explorer.download_btn"),
+      onClick: () => handleDownload(obj),
+    },
+    {
+      icon: <HiOutlineShare className="w-4 h-4 text-on-surface-variant" />,
+      label: t("buckets.explorer.share_btn"),
+      onClick: () => handleShare(obj),
+    },
+  ];
+
   const columns: Column<S3Object>[] = [
     {
       key: "name",
@@ -556,40 +571,25 @@ export default function BucketExplorerPage() {
     {
       key: "actions",
       header: "",
-      className: "text-right",
+      className: "text-right overflow-visible",
       render: (obj) => {
         const isDownloading = downloadTasks.some(
           (t) =>
             t.key === obj.id &&
             (t.status === "downloading" || t.status === "queued"),
         );
+
+        if (obj.type === "folder" || isDownloading) {
+          return null;
+        }
+
         return (
-          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {obj.type !== "folder" && !isDownloading && (
-              <>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownload(obj);
-                  }}
-                  className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded border border-transparent transition-all cursor-pointer"
-                  title={t("buckets.explorer.download_btn")}
-                >
-                  <HiOutlineDownload size={16} />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleShare(obj);
-                  }}
-                  className="p-1 text-on-surface-variant hover:text-primary hover:bg-surface-container-highest rounded border border-transparent transition-all cursor-pointer"
-                  title={t("buckets.share_modal.title")}
-                >
-                  <HiOutlineShare size={16} />
-                </button>
-              </>
-            )}
-          </div>
+          <ActionMenu
+            tooltip={t("buckets.explorer.actions_tooltip")}
+            isOpen={activeMenuId === obj.id}
+            onOpenChange={(open) => setActiveMenuId(open ? obj.id : null)}
+            items={getObjectActionItems(obj)}
+          />
         );
       },
     },
@@ -672,7 +672,7 @@ export default function BucketExplorerPage() {
                   </button>
                 )}
               </div>
-              
+
               {ssoNeedsLogin && (
                 <div className="mt-2 p-3 bg-surface-container border border-outline-variant rounded flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-in fade-in duration-300">
                   <div className="flex-1">
@@ -693,7 +693,7 @@ export default function BucketExplorerPage() {
                         await triggerSSOLogin(expiredProfile || "default");
                         setSsoNeedsLogin(false);
                         setExpiredProfile(null);
-                        
+
                         // Re-authenticate locally
                         const creds = await getLocalSSOCredentials(expiredProfile || "default");
                         setAwsCredentials(
@@ -703,7 +703,7 @@ export default function BucketExplorerPage() {
                           localStorage.getItem("aws_region") || "us-east-1",
                         );
                         localStorage.setItem("aws_sso_profile", expiredProfile || "default");
-                        
+
                         // Retry fetching objects
                         await fetchObjects();
                       } catch (err: any) {

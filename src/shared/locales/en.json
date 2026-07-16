@@ -201,7 +201,9 @@
       "select_files_title": "Select files to upload",
       "queued": "Queued",
       "add_routes_title": "Add to My Routes",
-      "remove_routes_title": "Remove from My Routes"
+      "remove_routes_title": "Remove from My Routes",
+      "actions_tooltip": "More actions",
+      "share_btn": "Share"
     },
     "favorite_modal": {
       "title": "Save to My Routes",
