@@ -1,6 +1,6 @@
 [package]
 name = "s3explorer"
-version = "1.4.1"
+version = "1.4.2"
 description = "Explore your S3 buckets easily and securely"
 authors = ["Wilson Blanco"]
 edition = "2021"
@@ -30,6 +30,7 @@ tauri-plugin-http = { version = "2.0.0", features = ["unsafe-headers"] }
 tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
 reqwest = { version = "0.12", features = ["stream"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 
