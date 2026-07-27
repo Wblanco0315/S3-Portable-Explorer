@@ -80,9 +80,16 @@ export const clearThrottledSave = (taskId: string) => {
     }
 };
 
+// Valor especial de maxRetries que indica reintentos ilimitados.
+export const UNLIMITED_RETRIES = -1;
+
 interface DownloadStore {
     tasks: DownloadTask[];
     maxConcurrentDownloads: number;
+    /** Reintentos automáticos por descarga. UNLIMITED_RETRIES (-1) = ilimitado. */
+    maxRetries: number;
+    /** Si es true, apaga el equipo al finalizar toda la cola de descargas. En memoria (no persiste entre sesiones por seguridad). */
+    shutdownWhenDone: boolean;
     initialize: () => Promise<void>;
     addTask: (task: Omit<DownloadTask, 'progress' | 'speed' | 'downloadedSize' | 'startTime'>) => void;
     updateTask: (id: string, updates: Partial<DownloadTask>) => void;
@@ -90,15 +97,39 @@ interface DownloadStore {
     removeTask: (id: string) => void;
     clearHistory: () => void;
     setMaxConcurrent: (count: number) => void;
+    setMaxRetries: (count: number) => void;
+    setShutdownWhenDone: (value: boolean) => void;
 }
 
 export const useDownloadStore = create<DownloadStore>((set) => ({
     tasks: [],
     maxConcurrentDownloads: 3,
+    maxRetries: 5,
+    shutdownWhenDone: false,
 
     initialize: async () => {
         const history = await getDownloadHistory();
-        set({ tasks: history });
+
+        // Cargar preferencias persistidas relevantes para el motor de descargas,
+        // de modo que estén disponibles aunque el usuario no abra la pantalla de Ajustes.
+        const patch: Partial<DownloadStore> = { tasks: history };
+        try {
+            const { getDb } = await import('../../shared/hooks/useDatabase');
+            const db = await getDb();
+            const rows = await db.select<{ key: string; value: string }[]>(
+                "SELECT key, value FROM settings WHERE key IN ('max_download_retries', 'max_concurrent_downloads')"
+            );
+            for (const row of rows) {
+                const num = parseInt(row.value, 10);
+                if (isNaN(num)) continue;
+                if (row.key === 'max_download_retries') patch.maxRetries = num;
+                if (row.key === 'max_concurrent_downloads') patch.maxConcurrentDownloads = num;
+            }
+        } catch (err) {
+            console.error('[DownloadStore] No se pudieron cargar las preferencias de descarga:', err);
+        }
+
+        set(patch);
     },
 
     addTask: (task) => {
@@ -187,5 +218,9 @@ export const useDownloadStore = create<DownloadStore>((set) => ({
         clearDbHistory();
     },
 
-    setMaxConcurrent: (count) => set({ maxConcurrentDownloads: count })
+    setMaxConcurrent: (count) => set({ maxConcurrentDownloads: count }),
+
+    setMaxRetries: (count) => set({ maxRetries: count }),
+
+    setShutdownWhenDone: (value) => set({ shutdownWhenDone: value })
 }));

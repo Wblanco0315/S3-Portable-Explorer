@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { safeConfirm as confirm } from "../shared/utils/dialog";
 import { useDatabase } from "../shared/hooks/useDatabase";
-import { useDownloadStore } from "../features/downloads/downloadStore";
+import { useDownloadStore, UNLIMITED_RETRIES } from "../features/downloads/downloadStore";
 import { isAwsAuthenticated, clearAwsCredentials } from "../features/aws/s3Client";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { 
@@ -36,7 +36,7 @@ export default function SettingsPage() {
   const [ssoFeedback, setSsoFeedback] = useState<string | null>(null);
 
   const { getSetting, saveSetting } = useDatabase();
-  const { maxConcurrentDownloads, setMaxConcurrent } = useDownloadStore();
+  const { maxConcurrentDownloads, setMaxConcurrent, maxRetries, setMaxRetries } = useDownloadStore();
 
   useEffect(() => {
     // Load existing settings
@@ -57,6 +57,15 @@ export default function SettingsPage() {
         const count = parseInt(val, 10);
         if (!isNaN(count)) {
           setMaxConcurrent(count);
+        }
+      }
+    });
+
+    getSetting("max_download_retries").then((val) => {
+      if (val) {
+        const count = parseInt(val, 10);
+        if (!isNaN(count)) {
+          setMaxRetries(count);
         }
       }
     });
@@ -101,6 +110,11 @@ export default function SettingsPage() {
   const handleConcurrentChange = async (count: number) => {
     setMaxConcurrent(count);
     await saveSetting("max_concurrent_downloads", String(count));
+  };
+
+  const handleRetriesChange = async (count: number) => {
+    setMaxRetries(count);
+    await saveSetting("max_download_retries", String(count));
   };
 
   const handleSaveSsoSettings = async (e: React.FormEvent) => {
@@ -243,7 +257,7 @@ export default function SettingsPage() {
                     {t("settings.concurrent_downloads_desc")}
                   </p>
                 </div>
-                <select 
+                <select
                   value={`${maxConcurrentDownloads} ${t("settings.threads")}`}
                   onChange={(e) => {
                     const val = parseInt(e.target.value.split(" ")[0], 10);
@@ -254,6 +268,29 @@ export default function SettingsPage() {
                   <option>{`4 ${t("settings.threads")}`}</option>
                   <option>{`8 ${t("settings.threads")}`}</option>
                   <option>{`16 ${t("settings.threads")}`}</option>
+                </select>
+              </div>
+
+              <div className="border-t border-outline-variant pt-gutter flex items-center justify-between">
+                <div>
+                  <h4 className="font-body-md text-body-md text-on-surface">{t("settings.download_retries")}</h4>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                    {t("settings.download_retries_desc")}
+                  </p>
+                </div>
+                <select
+                  value={String(maxRetries)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) handleRetriesChange(val);
+                  }}
+                  className="bg-surface border border-outline-variant text-on-surface font-label-sm text-label-sm rounded px-3 py-2 focus:border-primary focus:ring-0 focus:outline-none transition-colors w-32 cursor-pointer"
+                >
+                  <option value="0">{`0 ${t("settings.retries")}`}</option>
+                  <option value="3">{`3 ${t("settings.retries")}`}</option>
+                  <option value="5">{`5 ${t("settings.retries")}`}</option>
+                  <option value="10">{`10 ${t("settings.retries")}`}</option>
+                  <option value={String(UNLIMITED_RETRIES)}>{t("settings.unlimited")}</option>
                 </select>
               </div>
             </div>

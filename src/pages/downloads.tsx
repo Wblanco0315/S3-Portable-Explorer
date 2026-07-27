@@ -12,6 +12,7 @@ import {
     HiOutlineDocumentText,
     HiOutlinePause
 } from 'react-icons/hi';
+import { HiOutlinePower } from 'react-icons/hi2';
 import { useDownloadStore, DownloadTask } from '../features/downloads/downloadStore';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { safeConfirm as confirm } from '../shared/utils/dialog';
@@ -208,7 +209,7 @@ const DownloadItem = ({
 };
 
 export default function DownloadsPage() {
-    const { tasks, removeTask, clearHistory, retryTask, updateTask } = useDownloadStore();
+    const { tasks, removeTask, clearHistory, retryTask, updateTask, shutdownWhenDone, setShutdownWhenDone } = useDownloadStore();
     const [searchTerm, setSearchTerm] = useState('');
     const { t } = useTranslation();
 
@@ -222,6 +223,21 @@ export default function DownloadsPage() {
 
     const handlePause = (task: DownloadTask) => {
         updateTask(task.id, { status: 'paused', speed: '0 KB/s' });
+    };
+
+    const handleToggleShutdown = async () => {
+        // Al desactivar no se pide confirmación; al activar sí, por ser una acción destructiva.
+        if (shutdownWhenDone) {
+            setShutdownWhenDone(false);
+            return;
+        }
+        const confirmed = await confirm(
+            t('downloads.shutdown_confirm_message'),
+            { title: t('downloads.shutdown_confirm_title'), kind: 'warning' }
+        );
+        if (confirmed) {
+            setShutdownWhenDone(true);
+        }
     };
 
     const handleReveal = async (path: string) => {
@@ -248,21 +264,40 @@ export default function DownloadsPage() {
                         <h1 className="text-headline-lg font-bold text-on-surface">{t('downloads.title')}</h1>
                         <p className="text-body-md text-on-surface-variant mt-1">{t('downloads.subtitle')}</p>
                     </div>
-                    <button
-                        onClick={async () => {
-                            const confirmed = await confirm(
-                                t('downloads.clear_history_confirm'),
-                                { title: t('downloads.title'), kind: 'warning' }
-                            );
-                            if (confirmed) {
-                                clearHistory();
-                            }
-                        }}
-                        className="flex items-center justify-center gap-2 px-4 py-2 text-body-md font-medium text-error bg-surface-container border border-error/20 rounded hover:bg-error-container/25 transition-colors cursor-pointer"
-                    >
-                        <HiOutlineTrash size={16} />
-                        {t('downloads.clear_history')}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* Shutdown-when-done toggle */}
+                        <button
+                            onClick={handleToggleShutdown}
+                            title={t('downloads.shutdown_when_done_desc')}
+                            className={`flex items-center gap-2 px-3 py-2 text-body-md font-medium rounded border transition-colors cursor-pointer ${
+                                shutdownWhenDone
+                                    ? 'text-on-error bg-error border-transparent hover:bg-error/90'
+                                    : 'text-on-surface-variant bg-surface-container border-outline-variant hover:bg-surface-container-high'
+                            }`}
+                        >
+                            <HiOutlinePower size={16} />
+                            <span className="hidden sm:inline">{t('downloads.shutdown_when_done')}</span>
+                            <span className={`ml-1 relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${shutdownWhenDone ? 'bg-on-error/30' : 'bg-surface-bright'}`}>
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${shutdownWhenDone ? 'translate-x-4' : 'translate-x-0.5'}`}></span>
+                            </span>
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                const confirmed = await confirm(
+                                    t('downloads.clear_history_confirm'),
+                                    { title: t('downloads.title'), kind: 'warning' }
+                                );
+                                if (confirmed) {
+                                    clearHistory();
+                                }
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 text-body-md font-medium text-error bg-surface-container border border-error/20 rounded hover:bg-error-container/25 transition-colors cursor-pointer"
+                        >
+                            <HiOutlineTrash size={16} />
+                            {t('downloads.clear_history')}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Search Bar */}

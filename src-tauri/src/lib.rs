@@ -27,6 +27,34 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+/// Apaga el equipo de forma inmediata. Se dispara desde el frontend tras la
+/// cuenta regresiva, cuando el modo "apagar al terminar la cola" está activo.
+#[tauri::command]
+fn shutdown_system() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("shutdown")
+            .args(["/s", "/t", "0", "/c", "S3 Portable Explorer: cola de descargas finalizada"])
+            .spawn()
+            .map_err(|e| format!("No se pudo apagar el equipo: {}", e))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("osascript")
+            .args(["-e", "tell application \"System Events\" to shut down"])
+            .spawn()
+            .map_err(|e| format!("No se pudo apagar el equipo: {}", e))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("systemctl")
+            .arg("poweroff")
+            .spawn()
+            .map_err(|e| format!("No se pudo apagar el equipo: {}", e))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn download_chunk(
     url: String,
@@ -145,14 +173,21 @@ pub fn run() {
             // A stale SHM file tricks SQLite into thinking another process holds
             // a lock, which causes SQLITE_READONLY (code 8) on every subsequent launch.
             if let Ok(data_dir) = app.path().app_data_dir() {
-                let wal = data_dir.join("s3explorer_data.db-wal");
                 let shm = data_dir.join("s3explorer_data.db-shm");
-                // Remove stale WAL/SHM files left by a crash. At process startup
-                // no other instance holds the database, so these files are orphaned.
-                // Leaving them causes SQLITE_READONLY on the next open.
+                // Elimina SOLO el índice de memoria compartida (-shm) huérfano dejado
+                // por un cierre abrupto: es lo que engaña a SQLite haciéndole creer que
+                // otro proceso tiene el lock y provoca SQLITE_READONLY (código 8).
+                //
+                // IMPORTANTE: NO se borra el archivo -wal. Tras un apagado forzado
+                // (p. ej. la función "apagar al terminar" usa `shutdown /s /t 0`, que
+                // mata el proceso sin checkpoint), el -wal puede contener transacciones
+                // ya confirmadas pero aún no consolidadas en el .db (como el estado
+                // 'completed' de las descargas). Borrarlo perdería esos datos y la
+                // descarga volvería a verse "incompleta" al reiniciar. Al conservar el
+                // -wal, SQLite reconstruye el -shm y recupera el WAL en la próxima
+                // apertura de forma automática.
                 if shm.exists() {
                     let _ = std::fs::remove_file(&shm);
-                    let _ = std::fs::remove_file(&wal);
                 }
             }
 
@@ -217,7 +252,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![greet, download_chunk])
+        .invoke_handler(tauri::generate_handler![greet, download_chunk, shutdown_system])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

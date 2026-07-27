@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useDownloadStore } from './downloadStore';
+import { useDownloadStore, UNLIMITED_RETRIES } from './downloadStore';
 import { executeDownloadTask, isAwsAuthenticated } from '../aws/s3Client';
 import { safeConfirm } from '../../shared/utils/dialog';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,12 @@ import { useTranslation } from 'react-i18next';
 // Track which tasks are currently being executed by THIS instance of the manager
 const runningTasks = new Set<string>();
 
+// Reintento automático a nivel de tarea: si una descarga termina en 'error'
+// (por causas ajenas a los bloques, como fallo al firmar la URL o leer el tamaño),
+// se re-encola automáticamente según el límite configurado (con backoff).
+const autoRetryCounts = new Map<string, number>();
+const scheduledAutoRetries = new Set<string>();
+
 export const useDownloadManager = () => {
     const tasks = useDownloadStore((state) => state.tasks);
     const maxConcurrent = useDownloadStore((state) => state.maxConcurrentDownloads);
@@ -15,6 +21,9 @@ export const useDownloadManager = () => {
     const initializeStore = useDownloadStore((state) => state.initialize);
     const initialized = useRef(false);
     
+    const retryTask = useDownloadStore((state) => state.retryTask);
+    const maxRetries = useDownloadStore((state) => state.maxRetries);
+
     const navigate = useNavigate();
     const { t } = useTranslation();
     const hasPromptedRef = useRef(false);
@@ -58,6 +67,41 @@ export const useDownloadManager = () => {
         
         init();
     }, [initializeStore, updateTask]);
+
+    // Auto-reintento de tareas que terminaron en 'error'
+    useEffect(() => {
+        if (!initialized.current) return;
+        if (!isAwsAuthenticated()) return;
+
+        tasks.forEach((task) => {
+            // Al completar, liberar el contador para futuras descargas del mismo id
+            if (task.status === 'completed') {
+                autoRetryCounts.delete(task.id);
+                return;
+            }
+
+            if (task.status !== 'error' || scheduledAutoRetries.has(task.id)) return;
+
+            const unlimited = maxRetries === UNLIMITED_RETRIES;
+            const attempts = autoRetryCounts.get(task.id) || 0;
+            if (!unlimited && attempts >= maxRetries) return;
+
+            scheduledAutoRetries.add(task.id);
+            const delay = Math.min(3000 * (attempts + 1), 15000);
+
+            setTimeout(() => {
+                scheduledAutoRetries.delete(task.id);
+                const current = useDownloadStore.getState().tasks.find(t => t.id === task.id);
+                // Solo reintentar si sigue en error (el usuario no lo tocó entretanto)
+                if (current && current.status === 'error') {
+                    autoRetryCounts.set(task.id, attempts + 1);
+                    const limitLabel = unlimited ? '∞' : maxRetries;
+                    console.warn(`[DownloadManager] Auto-reintento ${attempts + 1}/${limitLabel} para: ${current.fileName}`);
+                    retryTask(task.id);
+                }
+            }, delay);
+        });
+    }, [tasks, retryTask, maxRetries]);
 
     useEffect(() => {
         if (!initialized.current) return;

@@ -4,10 +4,11 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile, exists } from "@tauri-apps/plugin-fs";
-import { useDownloadStore } from "../downloads/downloadStore";
+import { useDownloadStore, UNLIMITED_RETRIES } from "../downloads/downloadStore";
 import { getDownloadChunks, saveDownloadChunks, updateDownloadChunkStatus, deleteDownloadChunks } from "../downloads/downloadDatabase";
 import { getDb } from "../../shared/hooks/useDatabase";
 import { recordDownloadCompleted } from "../statistics/statisticsDatabase";
+import { formatEta } from "../../shared/utils/time";
 
 // We will store the client instance in memory after login
 let s3ClientInstance: S3Client | null = null;
@@ -426,6 +427,10 @@ export const executeDownloadTask = async (taskId: string) => {
   const task = store.tasks.find(t => t.id === taskId);
   if (!task) return;
 
+  // Reintentos por bloque configurables por el usuario. UNLIMITED_RETRIES = sin límite.
+  const maxChunkRetries = store.maxRetries;
+  const unlimitedRetries = maxChunkRetries === UNLIMITED_RETRIES;
+
   // Trailing-edge throttle helper defined locally
   function throttleTrailing<T extends (...args: any[]) => void>(func: T, limit: number): T {
     let lastFunc: number;
@@ -567,17 +572,7 @@ export const executeDownloadTask = async (taskId: string) => {
         else if (smoothSpeed > 1024) speedStr = `${(smoothSpeed / 1024).toFixed(1)} KB/s`;
         else speedStr = `${smoothSpeed.toFixed(0)} B/s`;
 
-        const etaSeconds = smoothSpeed > 0 ? (totalSize - currentBytes) / smoothSpeed : 0;
-        let etaStr = '';
-        if (etaSeconds > 0 && progress < 100) {
-          if (etaSeconds < 60) {
-            etaStr = `${Math.ceil(etaSeconds)}s`;
-          } else {
-            const minutes = Math.floor(etaSeconds / 60);
-            const seconds = Math.ceil(etaSeconds % 60);
-            etaStr = `${minutes}m ${seconds}s`;
-          }
-        }
+        const etaStr = progress < 100 ? formatEta(totalSize - currentBytes, smoothSpeed) : '';
 
         store.updateTask(taskId, {
           progress,
@@ -612,40 +607,74 @@ export const executeDownloadTask = async (taskId: string) => {
 
           const cRef = activeChunks.find(c => c.index === chunk.chunkIndex);
 
-          try {
-            console.log(`[S3Download] Descargando bloque ${chunk.chunkIndex}: ${chunk.startByte}-${chunk.endByte} vía Rust`);
-            
-            const channel = new Channel<number>();
-            channel.onmessage = (bytesDelta) => {
-              if (cRef) {
-                cRef.downloadedBytes = Math.min(cRef.downloadedBytes + bytesDelta, cRef.totalBytes);
-                updateProgress();
-              }
-            };
-
-            await invoke<number>("download_chunk", {
-              url,
-              savePath: task.savePath,
-              startByte: chunk.startByte,
-              endByte: chunk.endByte,
-              onProgress: channel
-            });
-
-            // Marcar fragmento como completado en memoria
-            if (cRef) {
-              cRef.completed = true;
-              cRef.downloadedBytes = cRef.totalBytes;
+          // Reintentar el bloque varias veces antes de dar la descarga por fallida.
+          // Esto evita que una caída de red transitoria aborte toda la descarga.
+          let attempt = 0;
+          let aborted = false;
+          while (true) {
+            // Abortar si el usuario pausó/canceló mientras reintentábamos
+            const stateTask = useDownloadStore.getState().tasks.find(t => t.id === taskId);
+            if (!stateTask || stateTask.status !== 'downloading') {
+              aborted = true;
+              break;
             }
 
-            // Marcar fragmento como completado en SQLite
-            await updateDownloadChunkStatus(taskId, chunk.chunkIndex, 1);
+            let attemptBytes = 0;
+            try {
+              console.log(`[S3Download] Descargando bloque ${chunk.chunkIndex}: ${chunk.startByte}-${chunk.endByte} vía Rust${attempt > 0 ? ` (reintento ${attempt})` : ''}`);
 
-            updateProgress();
-          } catch (err: any) {
-            hasError = true;
-            downloadError = err;
-            console.error(`[S3Download] Error en bloque ${chunk.chunkIndex}:`, err);
+              const channel = new Channel<number>();
+              channel.onmessage = (bytesDelta) => {
+                if (cRef) {
+                  attemptBytes += bytesDelta;
+                  cRef.downloadedBytes = Math.min(cRef.downloadedBytes + bytesDelta, cRef.totalBytes);
+                  updateProgress();
+                }
+              };
+
+              await invoke<number>("download_chunk", {
+                url,
+                savePath: task.savePath,
+                startByte: chunk.startByte,
+                endByte: chunk.endByte,
+                onProgress: channel
+              });
+
+              // Marcar fragmento como completado en memoria
+              if (cRef) {
+                cRef.completed = true;
+                cRef.downloadedBytes = cRef.totalBytes;
+              }
+
+              // Marcar fragmento como completado en SQLite
+              await updateDownloadChunkStatus(taskId, chunk.chunkIndex, 1);
+
+              updateProgress();
+              break; // Bloque completado con éxito
+            } catch (err: any) {
+              // Revertir los bytes parciales de este intento fallido para no inflar el progreso
+              if (cRef) {
+                cRef.downloadedBytes = Math.max(0, cRef.downloadedBytes - attemptBytes);
+                updateProgress();
+              }
+
+              attempt++;
+              if (!unlimitedRetries && attempt > maxChunkRetries) {
+                hasError = true;
+                downloadError = err;
+                console.error(`[S3Download] Bloque ${chunk.chunkIndex} falló tras ${maxChunkRetries} reintentos:`, err);
+                break;
+              }
+
+              // Backoff exponencial con tope (1s, 2s, 4s, 8s)
+              const backoff = Math.min(1000 * 2 ** (attempt - 1), 8000);
+              const limitLabel = unlimitedRetries ? '∞' : maxChunkRetries;
+              console.warn(`[S3Download] Bloque ${chunk.chunkIndex} falló, reintentando en ${backoff}ms (intento ${attempt}/${limitLabel})`, err);
+              await new Promise(resolve => setTimeout(resolve, backoff));
+            }
           }
+
+          if (aborted) break;
         }
       };
 

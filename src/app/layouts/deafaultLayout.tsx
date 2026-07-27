@@ -11,6 +11,7 @@ import Breadcrumbs from "../../components/navigation/Breadcrumbs";
 import { useDownloadStore } from "../../features/downloads/downloadStore";
 import { HiOutlineLink } from "react-icons/hi";
 import { DownloadManager } from "../../features/downloads/downloadManager";
+import { ShutdownManager } from "../../features/downloads/ShutdownManager";
 import { useTheme } from "../ThemeContext";
 import { HiOutlineSun, HiOutlineMoon } from "react-icons/hi";
 import pkg from "../../../package.json";
@@ -74,6 +75,7 @@ export default function DefaultLayout() {
   return (
     <div className="flex h-screen w-full bg-surface text-on-surface font-inter transition-colors duration-300">
       <DownloadManager />
+      <ShutdownManager />
       <UpdateNotifier />
       <LateralNavbar items={menuItems} logo={logo} footer={footer} />
 
