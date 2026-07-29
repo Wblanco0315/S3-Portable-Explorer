@@ -28,6 +28,12 @@ export default function DefaultLayout() {
   const activeDownloadsCount = tasks.filter(t => t.status === 'downloading' || t.status === 'queued').length;
   const { isLoading, message } = useLoadingStore();
 
+  // Group nested routes under a single transition key so navigating between
+  // their sub-routes doesn't remount the whole page (only the sub-view animates).
+  const routeTransitionKey = location.pathname.startsWith("/settings")
+    ? "/settings"
+    : location.pathname;
+
 
 
   const menuItems: NavItem[] = [
@@ -112,7 +118,10 @@ export default function DefaultLayout() {
         </header>
 
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <div key={location.pathname} className="flex-1 flex flex-col min-h-0 overflow-hidden route-transition">
+          {/* Animate on top-level page changes only. Nested routes (e.g. the
+              /settings sub-tabs) collapse to a single key so the whole view is
+              not remounted/re-animated when switching between them. */}
+          <div key={routeTransitionKey} className="flex-1 flex flex-col min-h-0 overflow-hidden route-transition">
             <Outlet />
           </div>
         </main>

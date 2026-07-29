@@ -44,9 +44,9 @@
     "download_dir_label": "Primary Download Directory",
     "browse_btn": "Browse...",
     "saving_btn": "Saving...",
-    "download_dir_desc": "Files downloaded from buckets will be saved here by default.",
+    "download_dir_desc": "Location where downloaded files will be saved by default.",
     "validate_checksums": "Validate Checksums",
-    "validate_checksums_desc": "Verify file integrity after download (MD5/SHA256).",
+    "validate_checksums_desc": "Verify file integrity automatically after download.",
     "concurrent_downloads": "Concurrent Downloads",
     "concurrent_downloads_desc": "Allow multiple transfers to optimize bandwidth.",
     "threads": "threads",
@@ -60,6 +60,13 @@
     "sso_start_url": "SSO Start URL",
     "sso_region": "SSO Region",
     "active_profile": "Active Profile",
+    "active_profile_desc": "The SSO role currently used to authenticate S3 requests.",
+    "sso_connection": "SSO Connection",
+    "sso_connection_desc": "Set the portal URL and region used for single sign-on.",
+    "connection_status": "Connection status",
+    "connected_desc": "Your session is active and credentials are valid for S3 access.",
+    "disconnected_desc": "No active session. Sign in from the login screen to connect.",
+    "aws_tip_desc": "Find your SSO Start URL in the AWS access portal. The region must match the one where your Identity Center is deployed.",
     "sync_profiles_title": "Sync profiles",
     "unlink_btn": "Unlink",
     "save_changes_btn": "Save Changes",
@@ -74,6 +81,10 @@
     "doc_support": "Documentation & Support",
     "doc_desc": "Refer to the technical guide for advanced IAM configuration and bucket policies.",
     "view_doc": "View Documentation",
+    "tip_title": "Tip",
+    "tip_desc": "Increasing concurrent threads can improve download speed in high latency networks, but consumes more CPU.",
+    "downloads_header_title": "Download Management",
+    "downloads_header_desc": "Configure storage paths and file transfer behavior.",
     "sso_saved_feedback": "SSO configuration saved",
     "unlink_feedback": "Connection unlinked successfully",
     "unlink_confirm": "Are you sure you want to unlink the AWS SSO connection?",
@@ -90,6 +101,12 @@
     "themes": {
       "light": "Light",
       "dark": "Dark"
+    },
+    "tabs": {
+      "downloads": "Downloads",
+      "system": "System",
+      "aws": "AWS SSO",
+      "about": "About"
     }
   },
   "buckets": {

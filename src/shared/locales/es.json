@@ -44,9 +44,9 @@
     "download_dir_label": "Directorio de Descarga Principal",
     "browse_btn": "Explorar...",
     "saving_btn": "Guardando...",
-    "download_dir_desc": "Los archivos descargados desde los buckets se guardarán aquí por defecto.",
+    "download_dir_desc": "Ubicación donde se guardarán los archivos descargados por defecto.",
     "validate_checksums": "Validación de Checksums",
-    "validate_checksums_desc": "Verificar la integridad de los archivos tras la descarga (MD5/SHA256).",
+    "validate_checksums_desc": "Verificar integridad de archivos automáticamente tras la descarga.",
     "concurrent_downloads": "Descargas Concurrentes",
     "concurrent_downloads_desc": "Permitir transferencias múltiples para optimizar el ancho de banda.",
     "threads": "hilos",
@@ -60,6 +60,13 @@
     "sso_start_url": "SSO Start URL",
     "sso_region": "Región SSO",
     "active_profile": "Perfil Activo (Profile)",
+    "active_profile_desc": "El rol de SSO usado actualmente para autenticar las solicitudes a S3.",
+    "sso_connection": "Conexión SSO",
+    "sso_connection_desc": "Define la URL del portal y la región usadas para el inicio de sesión único.",
+    "connection_status": "Estado de conexión",
+    "connected_desc": "Tu sesión está activa y las credenciales son válidas para acceder a S3.",
+    "disconnected_desc": "No hay sesión activa. Inicia sesión desde la pantalla de acceso para conectar.",
+    "aws_tip_desc": "Encuentra tu SSO Start URL en el portal de acceso de AWS. La región debe coincidir con la del despliegue de tu Identity Center.",
     "sync_profiles_title": "Sincronizar perfiles",
     "unlink_btn": "Desvincular",
     "save_changes_btn": "Guardar Cambios",
@@ -74,6 +81,10 @@
     "doc_support": "Documentación y Soporte",
     "doc_desc": "Consulta la guía técnica para configuraciones avanzadas de IAM y políticas de bucket.",
     "view_doc": "Ver Documentación",
+    "tip_title": "Consejo",
+    "tip_desc": "Aumentar los hilos concurrentes puede mejorar la velocidad en redes de alta latencia, pero consume más CPU.",
+    "downloads_header_title": "Gestión de Descargas",
+    "downloads_header_desc": "Configura las rutas de almacenamiento y el comportamiento de transferencia de archivos.",
     "sso_saved_feedback": "Configuración de SSO guardada",
     "unlink_feedback": "Conexión desvinculada exitosamente",
     "unlink_confirm": "¿Estás seguro de que deseas desvincular la conexión de AWS SSO?",
@@ -90,6 +101,12 @@
     "themes": {
       "light": "Claro",
       "dark": "Oscuro"
+    },
+    "tabs": {
+      "downloads": "Descargas",
+      "system": "Sistema",
+      "aws": "AWS SSO",
+      "about": "Acerca de"
     }
   },
   "buckets": {

@@ -44,8 +44,13 @@ function NavItemComponent({ item }: { item: NavItem }) {
   const itemFullTarget = item.path;
   const currentFullUrl = location.pathname + location.search;
 
-  // Exact match for the active state
-  const isActive = currentFullUrl === itemFullTarget || (location.pathname === itemFullTarget && !location.search);
+  // Active when the URL matches exactly, or falls under this item as a nested
+  // route (e.g. "/settings/downloads" keeps "/settings" highlighted). The root
+  // path "/" is excluded from the prefix rule so it doesn't match everything.
+  const isActive =
+    currentFullUrl === itemFullTarget ||
+    (location.pathname === itemFullTarget && !location.search) ||
+    (itemFullTarget !== "/" && location.pathname.startsWith(itemFullTarget + "/"));
 
   // Auto-expand if a child is active
   useEffect(() => {
