@@ -12,7 +12,6 @@ import {
 } from "react-icons/hi";
 import { useDatabase } from "../../shared/hooks/useDatabase";
 import { useDownloadStore, UNLIMITED_RETRIES } from "../../features/downloads/downloadStore";
-import { HiOutlineChevronDoubleDown } from "react-icons/hi2";
 import SectionHeader from "./SectionHeader";
 
 /** Download-related preferences: destination folder, checksums, concurrency, retries. */
