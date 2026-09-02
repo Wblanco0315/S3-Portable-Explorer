@@ -42,9 +42,9 @@ export default function SettingsLayout() {
             key={key}
             to={to}
             className={({ isActive }) =>
-              `group relative flex items-center gap-2 rounded-t-lg border border-outline-variant px-4 font-label-md text-label-md transition-all duration-200 cursor-pointer select-none ${isActive
+              `group relative flex items-center gap-2 rounded-t-lg border border-outline-variant px-4 font-label-md text-label-md transition-colors duration-200 cursor-pointer select-none ${isActive
                 ? "-mb-px z-20 bg-surface-container border-b-surface-container pt-3 pb-3 text-on-surface font-semibold"
-                : "z-0 mt-[3px] bg-surface-container-low border-b-outline-variant pt-2 pb-2 text-on-surface-variant hover:bg-surface-container hover:text-on-surface hover:mt-[1px]"
+                : "z-0 bg-surface-container-low border-b-outline-variant pt-2 pb-2 text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
               }`
             }
           >
